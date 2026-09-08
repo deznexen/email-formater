@@ -1,0 +1,640 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Φόρμες email</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#11161B; --paper:#1A2128; --ink:#E3E9ED; --muted:#8F9DA9;
+    --line:#2C363F; --line-soft:#232B33; --accent:#49C6E8; --accent-soft:#17323E;
+    --amber:#D6A264; --amber-soft:#33281B;
+    --radius:4px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    font-family:"Fira Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+    font-size:15px; line-height:1.5;
+  }
+  .wrap{max-width:1160px;margin:0 auto;padding:20px 18px 60px}
+
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;margin-bottom:18px}
+  h1{font-size:21px;font-weight:600;margin:0;letter-spacing:-.2px}
+  header p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+  .sig{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .sig label{font-size:13px;color:var(--muted)}
+
+  input[type=text],textarea,select{
+    font:inherit;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:var(--radius);padding:7px 9px;width:100%;
+  }
+  textarea{resize:vertical}
+  input:focus-visible,textarea:focus-visible,button:focus-visible,select:focus-visible{
+    outline:2px solid var(--accent);outline-offset:1px;
+  }
+
+  .layout{display:grid;grid-template-columns:236px minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
+  .panel > h2{
+    font-size:13px;font-weight:600;color:var(--muted);margin:0;
+    padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  }
+  .panel .body{padding:14px}
+
+  /* template list */
+  ul.forms{list-style:none;margin:0;padding:6px}
+  ul.forms li{margin:0}
+  ul.forms button{
+    display:block;width:100%;text-align:right;background:none;border:0;
+    font:inherit;color:var(--ink);padding:8px 10px 8px 12px;border-radius:var(--radius);
+    cursor:pointer;text-align:left;border-left:3px solid transparent;
+  }
+  ul.forms button:hover{background:var(--line-soft)}
+  ul.forms button[aria-current=true]{background:var(--accent-soft);border-left-color:var(--accent);font-weight:500}
+  .newform{margin:6px;width:calc(100% - 12px)}
+
+  button.act{
+    font:inherit;background:var(--paper);border:1px solid var(--line);color:var(--ink);
+    padding:7px 12px;border-radius:var(--radius);cursor:pointer;
+  }
+  button.act:hover{background:var(--line-soft)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#07202B;font-weight:600}
+  button.primary:hover{background:#6FD6F2;border-color:#6FD6F2}
+  button.link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:2px 4px;text-decoration:underline}
+
+  .field{margin-bottom:13px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+
+  .rows{display:flex;flex-direction:column;gap:8px}
+  .row{display:grid;grid-template-columns:1fr 1fr 190px 28px;gap:6px;align-items:center}
+  .row input{padding:6px 8px;font-size:14px}
+  .row .del{background:none;border:0;color:var(--muted);cursor:pointer;font-size:17px;line-height:1;padding:4px}
+  .row .del:hover{color:#E08585}
+  .rowhead{display:grid;grid-template-columns:1fr 1fr 190px 28px;gap:6px;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .dur{display:grid;grid-template-columns:1fr auto;gap:6px}
+  .dur button{
+    font:inherit;background:var(--accent-soft);border:1px solid var(--line);color:var(--accent);
+    padding:7px 14px;border-radius:var(--radius);cursor:pointer;font-weight:500;white-space:nowrap;
+  }
+  .row .dur button{padding:6px 9px;font-size:13px}
+  .gblock{border:1px solid var(--line-soft);border-radius:var(--radius);padding:9px;display:flex;flex-direction:column;gap:6px}
+  .gtop{display:grid;grid-template-columns:1fr 28px;gap:6px;align-items:center}
+  .crow{display:grid;grid-template-columns:1fr 165px;gap:6px}
+  .crow select{padding:6px 8px;font-size:14px}
+  .gblock input{padding:6px 8px;font-size:14px}
+  .seg{display:flex;gap:6px}
+  .seg button{
+    font:inherit;flex:1;background:var(--paper);border:1px solid var(--line);color:var(--muted);
+    padding:7px 12px;border-radius:var(--radius);cursor:pointer;
+  }
+  .seg button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+  .seg button:hover{border-color:var(--accent)}
+  .row .dur input{min-width:0}
+  .dur button:hover{border-color:var(--accent)}
+
+  /* preview */
+  .out{padding:14px}
+  #body::placeholder,input::placeholder{color:#6B7883}
+  .subject{font-weight:500;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-soft);font-size:14.5px}
+  #body{
+    width:100%;min-height:340px;border:0;padding:0;font-size:15px;line-height:1.62;
+    background:transparent;
+  }
+  #body:focus{outline:none}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:11px 14px;border-top:1px solid var(--line-soft)}
+  .note{font-size:12.5px;color:var(--amber);background:var(--amber-soft);padding:2px 8px;border-radius:20px}
+  .ok{font-size:13px;color:var(--accent)}
+  mark{background:var(--amber-soft);color:var(--amber);padding:0 2px}
+
+  details.editor{margin-top:16px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
+  details.editor summary{padding:11px 14px;cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
+  details.editor .body{padding:0 14px 14px}
+  details.editor textarea{min-height:210px;font-size:14px;line-height:1.55}
+  .hint{font-size:12.5px;color:var(--muted);margin:6px 0 10px}
+  code{background:var(--line-soft);padding:1px 5px;border-radius:3px;font-size:12.5px}
+
+  @media (max-width:980px){
+    .layout{grid-template-columns:1fr}
+    .sig{margin-left:0;width:100%}
+    .row,.rowhead{grid-template-columns:1fr 1fr;}
+    .rowhead{display:none}
+    .row .del{justify-self:end}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Φόρμες email</h1>
+      <p>Διάλεξε φόρμα, συμπλήρωσε τα πεδία, αντίγραψε το έτοιμο κείμενο.</p>
+    </div>
+    <div class="sig">
+      <label for="sig">Υπογραφή</label>
+      <input type="text" id="sig" placeholder="π.χ. Αλέξανδρος, Τμήμα Εξυπηρέτησης">
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="panel" aria-label="Φόρμες">
+      <h2>Οι φόρμες σου</h2>
+      <ul class="forms" id="list"></ul>
+      <button class="act newform" id="addForm">+ Νέα φόρμα</button>
+    </nav>
+
+    <section class="panel">
+      <h2 id="fieldsTitle">Στοιχεία</h2>
+      <div class="body" id="fields"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Έτοιμο email</h2>
+      <div class="out">
+        <div class="subject" id="subj"></div>
+        <textarea id="body" spellcheck="false"></textarea>
+      </div>
+      <div class="toolbar">
+        <button class="act primary" id="copyBody">Αντιγραφή κειμένου</button>
+        <button class="act" id="copySubj">Αντιγραφή θέματος</button>
+        <button class="act" id="reset" hidden>Επαναφορά από τα πεδία</button>
+        <span id="status" class="ok" aria-live="polite"></span>
+      </div>
+    </section>
+  </div>
+
+  <details class="editor">
+    <summary>Επεξεργασία της φόρμας</summary>
+    <div class="body">
+      <p class="hint">Γράψε το κείμενο όπως θέλεις. Όπου βάλεις <code>{{proionta}}</code> μπαίνει η λίστα προϊόντων, <code>{{diastima}}</code> ο χρόνος αναμονής, <code>{{pelatis}}</code> το όνομα, <code>{{parangelia}}</code> ο αριθμός παραγγελίας, <code>{{ypografi}}</code> η υπογραφή. Τα πεδία αριστερά προσαρμόζονται μόνα τους.<br>Για ενικό/πληθυντικό γράψε <code>[[ενικός|πληθυντικός]]</code> — π.χ. <code>[[το προϊόν αναμένεται|τα προϊόντα αναμένονται]]</code>. Όταν υπάρχει ένα μόνο προϊόν μπαίνει το πρώτο, αλλιώς το δεύτερο.</p>
+      <div class="field"><label for="tName">Όνομα φόρμας</label><input type="text" id="tName"></div>
+      <div class="field"><label for="tSubj">Θέμα</label><input type="text" id="tSubj"></div>
+      <div class="field"><label for="tBody">Κείμενο</label><textarea id="tBody"></textarea></div>
+      <button class="act primary" id="saveT">Αποθήκευση φόρμας</button>
+      <button class="act" id="delT">Διαγραφή φόρμας</button>
+      <span id="tstatus" class="ok"></span>
+    </div>
+  </details>
+</div>
+
+<script>
+const DEFAULTS = [
+  {
+    id:"paralavi", name:"Αναμονή παραλαβής",
+    subject:"Σχετικά με την παραγγελία σας",
+    body:`Καλησπέρα σας,
+
+Θα θέλαμε να σας ενημερώσουμε ότι [[το παρακάτω προϊόν της παραγγελίας σας αναμένεται να παραληφθεί|τα παρακάτω προϊόντα της παραγγελίας σας αναμένονται να παραληφθούν]] από εμάς:
+
+{{proionta}}
+
+Θα θέλαμε να σας ρωτήσουμε εάν επιθυμείτε να περιμένετε μέχρι την παραλαβή [[του|τους]], ώστε να αποσταλεί η παραγγελία σας ολοκληρωμένη, ή εάν προτιμάτε να προχωρήσουμε διαφορετικά.
+
+Παρακαλούμε ενημερώστε μας για το πώς θα θέλατε να προχωρήσουμε.
+
+Σας ευχαριστούμε πολύ για την κατανόηση και την υπομονή σας.
+
+Με εκτίμηση,
+{{ypografi}}`
+  },
+  {
+    id:"elleipsi", name:"Προϊόντα σε έλλειψη",
+    subject:"Σχετικά με την παραγγελία σας",
+    body:`Καλησπέρα σας,
+
+Θα θέλαμε να σας ενημερώσουμε ότι [[το παρακάτω προϊόν της παραγγελίας σας δεν είναι διαθέσιμο|τα παρακάτω προϊόντα της παραγγελίας σας δεν είναι διαθέσιμα]]:
+
+{{proionta}}
+
+Παρακαλούμε ενημερώστε μας πώς θα επιθυμούσατε να προχωρήσουμε:
+
+• να [[αφαιρέσουμε το μη διαθέσιμο προϊόν|αφαιρέσουμε τα μη διαθέσιμα προϊόντα]] από την παραγγελία σας,
+• να μας υποδείξετε [[κάποιο άλλο προϊόν|κάποια άλλα προϊόντα]] για αντικατάσταση, ή
+• να προχωρήσουμε στην ακύρωση της παραγγελίας σας.
+
+Σε περίπτωση που επιθυμείτε αντικατάσταση, μπορείτε να μας απαντήσετε με [[το προϊόν|τα προϊόντα]] που θα θέλατε να προσθέσουμε.
+
+Παρακαλούμε ενημερώστε μας για την επιλογή σας, ώστε να προχωρήσουμε άμεσα στην επεξεργασία της παραγγελίας σας.
+
+Σας ευχαριστούμε πολύ για την κατανόηση.
+
+Με εκτίμηση,
+{{ypografi}}`
+  },
+  {
+    id:"gefsi", name:"Δεν επιλέχθηκε γεύση",
+    subject:"Επιλογή γεύσης για την παραγγελία σας",
+    body:`Καλησπέρα σας,
+
+Σας ευχαριστούμε για την παραγγελία σας. Παρατηρήσαμε ότι δεν [[έχει επιλεγεί γεύση για το παρακάτω προϊόν|έχουν επιλεγεί γεύσεις για τα παρακάτω προϊόντα]] της παραγγελίας σας. Οι διαθέσιμες [[επιλογές είναι|επιλογές ανά προϊόν είναι]] οι εξής:
+
+{{gefseis}}
+
+Παρακαλούμε ενημερώστε μας [[ποια γεύση επιθυμείτε|ποιες γεύσεις επιθυμείτε]], ώστε να προχωρήσουμε άμεσα στην αποστολή της παραγγελίας σας.
+
+Σας ευχαριστούμε πολύ για τη συνεργασία.
+
+Με εκτίμηση,
+{{ypografi}}`
+  },
+  {
+    id:"combo", name:"Συνδυαστικό (όλα μαζί)",
+    subject:"Σχετικά με την παραγγελία σας",
+    body:`Καλησπέρα σας,
+
+Σας ευχαριστούμε για την παραγγελία σας. Θα θέλαμε να σας ενημερώσουμε για τα εξής:
+
+{{provlimata}}
+
+Παρακαλούμε ενημερώστε μας πώς θα θέλατε να προχωρήσουμε, ώστε να επεξεργαστούμε άμεσα την παραγγελία σας.
+
+Σας ευχαριστούμε πολύ για την κατανόηση.
+
+Με εκτίμηση,
+{{ypografi}}`
+  },
+  {
+    id:"epistrofi", name:"Επιστροφή προϊόντος",
+    subject:"Οδηγίες επιστροφής προϊόντος",
+    body:`{{prosfonisi}} {{pelatis}},
+
+Σας ευχαριστούμε που επικοινωνήσατε μαζί μας. Παρακάτω θα βρείτε τις οδηγίες για την επιστροφή του προϊόντος σας.
+
+━━━━━━━━━━━━━━━━━━━━━━
+📦 ΑΡΙΘΜΟΣ ΕΝΤΟΛΗΣ ΕΠΙΣΤΡΟΦΗΣ: {{entoli}}
+━━━━━━━━━━━━━━━━━━━━━━
+
+Παρακαλούμε κρατήστε τον παραπάνω αριθμό — θα τον χρειαστείτε σε κάθε βήμα της διαδικασίας.
+
+🚚 ΕΠΙΛΟΓΗ 1 – Παραλαβή από τον χώρο σας (εντός 1-2 εργάσιμων ημερών)
+1. Ο διανομέας της μεταφορικής θα επικοινωνήσει μαζί σας για να συμφωνήσετε ημέρα και ώρα παραλαβής
+2. Κατά την παραλαβή, θα πρέπει να ζητήσετε από τον διανομέα το Voucher Επιστροφής (αριθμό παρακολούθησης) και να μας το αποστείλετε, ώστε να μπορούμε να παρακολουθούμε την πορεία του δέματος
+3. Παραδίδετε το προϊόν στον διανομέα
+
+🏪 ΕΠΙΛΟΓΗ 2 – Παράδοση στο κατάστημα της μεταφορικής αυτοπροσώπως
+1. Μεταβείτε στο πλησιέστερο κατάστημα της μεταφορικής εταιρείας που σας παρέδωσε το δέμα αρχικά
+2. Δηλώστε τον Αριθμό Εντολής Επιστροφής: {{entoli}}
+3. Το προσωπικό τους θα αναλάβει την υπόλοιπη διαδικασία
+
+Για οποιαδήποτε απορία, είμαστε στη διάθεσή σας.
+
+Φιλικά,
+{{ypografi}}`
+  }
+];
+
+const LABELS = {
+  pelatis:"Όνομα πελάτη",
+  parangelia:"Αριθμός παραγγελίας",
+  entoli:"Αριθμός εντολής επιστροφής",
+  diastima:"Χρόνος αναμονής",
+  tracking:"Κωδικός αποστολής",
+  metaforiki:"Μεταφορική",
+  poso:"Ποσό",
+  imerominia:"Ημερομηνία"
+};
+const UNITS = ["ημέρες","εργάσιμες","εβδομάδες"];
+let durNum = "", durUnit = "ημέρες";
+const ONE = {"ημέρες":"ημέρα", "εβδομάδες":"εβδομάδα", "εργάσιμες":"εργάσιμη"};
+function unitFor(n, u){
+  u = u || "ημέρες";
+  return n.trim() === "1" ? (ONE[u] || u) : u;
+}
+const durValue = () => durNum.trim() ? durNum.trim() + " " + unitFor(durNum, durUnit) : "";
+
+let templates = DEFAULTS.map(t => ({...t}));
+let current = templates[0].id;
+let values = {};            // token -> string
+let items = [{n:"",l:"",t:"",u:"ημέρες"}]; // γραμμές προϊόντων
+let gItems = [{n:"",f:""}];               // προϊόντα με επιλογές γεύσης
+let cItems = [{n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}]; // συνδυαστικό
+const TYPES = {elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
+
+const SECTIONS = {
+  elleipsi: {
+    intro:"[[Το παρακάτω προϊόν της παραγγελίας σας δεν είναι διαθέσιμο|Τα παρακάτω προϊόντα της παραγγελίας σας δεν είναι διαθέσιμα]]:",
+    outro:"Μπορούμε είτε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας και να σας επιστρέψουμε το αντίστοιχο ποσό, είτε να [[το|τα]] αντικαταστήσουμε με [[κάποιο άλλο προϊόν|κάποια άλλα προϊόντα]] της επιλογής σας."
+  },
+  anamoni: {
+    intro:"[[Το παρακάτω προϊόν αναμένεται να παραληφθεί από εμάς|Τα παρακάτω προϊόντα αναμένονται να παραληφθούν από εμάς]]:",
+    outro:"Μπορείτε είτε να περιμένετε μέχρι την παραλαβή [[του|τους]], ώστε η παραγγελία σας να αποσταλεί ολοκληρωμένη, είτε να προχωρήσουμε με όσα είναι ήδη διαθέσιμα."
+  },
+  gefsi: {
+    intro:"Δεν [[έχει επιλεγεί γεύση για το παρακάτω προϊόν|έχουν επιλεγεί γεύσεις για τα παρακάτω προϊόντα]]. Οι διαθέσιμες επιλογές είναι:",
+    outro:"Παρακαλούμε ενημερώστε μας [[ποια γεύση επιθυμείτε|ποιες γεύσεις επιθυμείτε]]."
+  }
+};
+
+function num(text, single){
+  return text.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, (_,a,b) => single ? a : b);
+}
+function comboLine(c){
+  let line = "• " + (c.n.trim() || c.l.trim());
+  if(c.n.trim() && c.l.trim()) line += " – " + c.l.trim();
+  if(c.type === "anamoni" && c.t.trim()) line += " (αναμένεται σε " + c.t.trim() + " " + unitFor(c.t, c.u) + ")";
+  if(c.type === "gefsi"){
+    const fl = c.f.split(",").map(x => x.trim()).filter(Boolean);
+    if(fl.length) line += "\n" + fl.map(x => "   – " + x).join("\n");
+  }
+  return line;
+}
+function comboText(){
+  const parts = [];
+  ["elleipsi","anamoni","gefsi"].forEach(type => {
+    const rows = cItems.filter(c => c.type === type && (c.n.trim() || c.l.trim()));
+    if(!rows.length) return;
+    const single = rows.length === 1, sec = SECTIONS[type];
+    parts.push(num(sec.intro, single) + "\n\n" + rows.map(comboLine).join("\n") + "\n\n" + num(sec.outro, single));
+  });
+  return parts.join("\n\n");
+}
+let manual = false;         // ο χρήστης πείραξε το κείμενο
+let signature = "";
+
+const $ = s => document.querySelector(s);
+
+/* ---------- αποθήκευση ---------- */
+async function load(){
+  try{
+    const r = await window.storage.get("forms_v9");
+    if(r && r.value){
+      const d = JSON.parse(r.value);
+      if(Array.isArray(d.templates) && d.templates.length) templates = d.templates;
+      if(typeof d.signature === "string") signature = d.signature;
+      if(!templates.some(t => t.id === current)) current = templates[0].id;
+      return;
+    }
+  }catch(e){ /* πρώτη χρήση */ }
+  try{
+    const old = await window.storage.get("forms_v8");
+    if(old && old.value){
+      const d = JSON.parse(old.value);
+      if(typeof d.signature === "string") signature = d.signature;
+    }
+  }catch(e){}
+}
+async function save(){
+  try{ await window.storage.set("forms_v9", JSON.stringify({templates, signature})); }catch(e){}
+}
+
+/* ---------- βοηθητικά ---------- */
+const tpl = () => templates.find(t => t.id === current);
+function tokens(t){
+  const found = [];
+  (t.subject + " " + t.body).replace(/\{\{(\w+)\}\}/g, (_,k) => { if(!found.includes(k)) found.push(k); return _; });
+  return found;
+}
+function listText(){
+  const rows = items.filter(i => i.n.trim() || i.l.trim());
+  if(!rows.length) return "";
+  return rows.map(i => {
+    let line = "• " + (i.n.trim() || i.l.trim());
+    if(i.n.trim() && i.l.trim()) line += " – " + i.l.trim();
+    if(i.t.trim()) line += " (αναμένεται σε " + i.t.trim() + " " + unitFor(i.t, i.u) + ")";
+    return line;
+  }).join("\n");
+}
+function gefseisText(){
+  const rows = gItems.filter(g => g.n.trim());
+  if(!rows.length) return "";
+  return rows.map(g => {
+    let block = "• " + g.n.trim();
+    const fl = g.f.split(",").map(x => x.trim()).filter(Boolean);
+    if(fl.length) block += "\n" + fl.map(x => "   – " + x).join("\n");
+    return block;
+  }).join("\n\n");
+}
+function countItems(){
+  if(tokens(tpl()).includes("gefseis")) return gItems.filter(g => g.n.trim()).length;
+  return items.filter(i => i.n.trim() || i.l.trim()).length;
+}
+function fill(text){
+  const single = countItems() === 1;
+  text = text.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, (_,s,p) => single ? s : p);
+  return text.replace(/\{\{(\w+)\}\}/g, (_,k) => {
+    if(k === "proionta") return listText() || "[λίστα προϊόντων]";
+    if(k === "gefseis") return gefseisText() || "[προϊόντα και γεύσεις]";
+    if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
+    if(k === "ypografi") return signature.trim() || "[υπογραφή]";
+    if(k === "diastima") return durValue() || "[χρόνος αναμονής]";
+    const v = (values[k] || "").trim();
+    return v || "[" + (LABELS[k] || k) + "]";
+  });
+}
+
+/* ---------- render ---------- */
+function renderList(){
+  $("#list").innerHTML = "";
+  templates.forEach(t => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.textContent = t.name;
+    b.setAttribute("aria-current", t.id === current);
+    b.onclick = () => { current = t.id; manual = false; renderAll(); };
+    li.appendChild(b); $("#list").appendChild(li);
+  });
+}
+
+function renderFields(){
+  const t = tpl(), box = $("#fields");
+  box.innerHTML = "";
+  $("#fieldsTitle").textContent = "Στοιχεία — " + t.name;
+  const ks = tokens(t).filter(k => k !== "ypografi");
+  if(!ks.length){ box.innerHTML = '<p class="hint">Αυτή η φόρμα δεν έχει πεδία. Το κείμενο είναι έτοιμο δεξιά.</p>'; return; }
+
+  ks.forEach(k => {
+    const f = document.createElement("div"); f.className = "field";
+    if(k === "proionta"){
+      f.innerHTML = '<label>Προϊόντα</label><div class="rowhead"><span>Προϊόν</span><span>Link</span><span>Χρόνος αναμονής</span><span></span></div><div class="rows"></div>';
+      const rows = f.querySelector(".rows");
+      items.forEach((it, idx) => {
+        if(!it.u) it.u = "ημέρες";
+        const r = document.createElement("div"); r.className = "row";
+        r.innerHTML = '<input type="text" placeholder="Όνομα προϊόντος"><input type="text" placeholder="https://"><div class="dur"><input type="text" placeholder="π.χ. 2–3"><button type="button" title="Άλλαξε μονάδα"></button></div><button class="del" title="Διαγραφή">×</button>';
+        const a = r.children[0], b = r.children[1];
+        const c = r.querySelector(".dur input"), u = r.querySelector(".dur button");
+        a.value = it.n; b.value = it.l; c.value = it.t; u.textContent = it.u;
+        a.oninput = e => { it.n = e.target.value; renderOut(); };
+        b.oninput = e => { it.l = e.target.value; renderOut(); };
+        c.oninput = e => { it.t = e.target.value; renderOut(); };
+        u.onclick = () => {
+          it.u = UNITS[(UNITS.indexOf(it.u) + 1) % UNITS.length];
+          u.textContent = it.u; renderOut();
+        };
+        r.querySelector(".del").onclick = () => {
+          items.splice(idx,1);
+          if(!items.length) items.push({n:"",l:"",t:"",u:"ημέρες"});
+          renderFields(); renderOut();
+        };
+        rows.appendChild(r);
+      });
+      const add = document.createElement("button");
+      add.className = "act"; add.textContent = "+ Προϊόν";
+      add.style.marginTop = "8px";
+      add.onclick = () => { items.push({n:"",l:"",t:"",u:"ημέρες"}); renderFields(); };
+      f.appendChild(add);
+    } else if(k === "provlimata"){
+      f.innerHTML = '<label>Προϊόντα και τι συμβαίνει στο καθένα</label><div class="rows"></div>';
+      const rows = f.querySelector(".rows");
+      cItems.forEach((c, idx) => {
+        const blk = document.createElement("div"); blk.className = "gblock";
+        let extra = "";
+        if(c.type === "anamoni") extra = '<div class="dur"><input type="text" placeholder="π.χ. 2–3"><button type="button" title="Άλλαξε μονάδα"></button></div>';
+        if(c.type === "gefsi") extra = '<input type="text" class="fl" placeholder="Γεύσεις, χωρισμένες με κόμμα">';
+        blk.innerHTML = '<div class="gtop"><input type="text" placeholder="Όνομα προϊόντος"><button class="del" title="Διαγραφή">×</button></div>'
+          + '<div class="crow"><input type="text" placeholder="https://"><select></select></div>' + extra;
+        const name = blk.querySelector(".gtop input");
+        const link = blk.querySelector(".crow input");
+        const sel = blk.querySelector("select");
+        Object.keys(TYPES).forEach(k2 => {
+          const o = document.createElement("option");
+          o.value = k2; o.textContent = TYPES[k2]; o.selected = c.type === k2;
+          sel.appendChild(o);
+        });
+        name.value = c.n; link.value = c.l;
+        name.oninput = e => { c.n = e.target.value; renderOut(); };
+        link.oninput = e => { c.l = e.target.value; renderOut(); };
+        sel.onchange = e => { c.type = e.target.value; renderFields(); renderOut(); };
+        if(c.type === "anamoni"){
+          if(!c.u) c.u = "ημέρες";
+          const t = blk.querySelector(".dur input"), u = blk.querySelector(".dur button");
+          t.value = c.t; u.textContent = c.u;
+          t.oninput = e => { c.t = e.target.value; renderOut(); };
+          u.onclick = () => { c.u = UNITS[(UNITS.indexOf(c.u) + 1) % UNITS.length]; u.textContent = c.u; renderOut(); };
+        }
+        if(c.type === "gefsi"){
+          const fl = blk.querySelector(".fl");
+          fl.value = c.f;
+          fl.oninput = e => { c.f = e.target.value; renderOut(); };
+        }
+        blk.querySelector(".del").onclick = () => {
+          cItems.splice(idx,1);
+          if(!cItems.length) cItems.push({n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""});
+          renderFields(); renderOut();
+        };
+        rows.appendChild(blk);
+      });
+      const add = document.createElement("button");
+      add.className = "act"; add.textContent = "+ Προϊόν";
+      add.style.marginTop = "8px";
+      add.onclick = () => { cItems.push({n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}); renderFields(); };
+      f.appendChild(add);
+    } else if(k === "gefseis"){
+      f.innerHTML = '<label>Προϊόντα και διαθέσιμες γεύσεις</label><div class="rows"></div>';
+      const rows = f.querySelector(".rows");
+      gItems.forEach((g, idx) => {
+        const blk = document.createElement("div"); blk.className = "gblock";
+        blk.innerHTML = '<div class="gtop"><input type="text" placeholder="Όνομα προϊόντος"><button class="del" title="Διαγραφή">×</button></div><input type="text" placeholder="Γεύσεις, χωρισμένες με κόμμα">';
+        const name = blk.querySelector(".gtop input"), fl = blk.children[1];
+        name.value = g.n; fl.value = g.f;
+        name.oninput = e => { g.n = e.target.value; renderOut(); };
+        fl.oninput = e => { g.f = e.target.value; renderOut(); };
+        blk.querySelector(".del").onclick = () => {
+          gItems.splice(idx,1);
+          if(!gItems.length) gItems.push({n:"",f:""});
+          renderFields(); renderOut();
+        };
+        rows.appendChild(blk);
+      });
+      const add = document.createElement("button");
+      add.className = "act"; add.textContent = "+ Προϊόν";
+      add.style.marginTop = "8px";
+      add.onclick = () => { gItems.push({n:"",f:""}); renderFields(); };
+      f.appendChild(add);
+    } else if(k === "prosfonisi"){
+      if(!values.prosfonisi) values.prosfonisi = "Αγαπητέ";
+      f.innerHTML = '<label>Προσφώνηση</label><div class="seg"></div>';
+      const seg = f.querySelector(".seg");
+      [["Αγαπητέ","Άνδρας"],["Αγαπητή","Γυναίκα"]].forEach(([v,lbl]) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = lbl;
+        b.setAttribute("aria-pressed", values.prosfonisi === v);
+        b.onclick = () => { values.prosfonisi = v; renderFields(); renderOut(); };
+        seg.appendChild(b);
+      });
+    } else if(k === "diastima"){
+      if(tokens(t).includes("proionta")) return;  // ο χρόνος μπαίνει ανά προϊόν
+      f.innerHTML = '<label for="f_diastima">Χρόνος αναμονής</label><div class="dur"><input type="text" id="f_diastima" placeholder="π.χ. 2–3"><button type="button" title="Άλλαξε μονάδα"></button></div>';
+      const inp = f.querySelector("input"), btn = f.querySelector("button");
+      inp.value = durNum; btn.textContent = durUnit;
+      inp.oninput = e => { durNum = e.target.value; renderOut(); };
+      btn.onclick = () => {
+        durUnit = UNITS[(UNITS.indexOf(durUnit) + 1) % UNITS.length];
+        btn.textContent = durUnit; renderOut();
+      };
+    } else {
+      const id = "f_" + k;
+      f.innerHTML = '<label for="'+id+'">' + (LABELS[k] || k) + '</label><input type="text" id="'+id+'">';
+      const inp = f.querySelector("input");
+      inp.value = values[k] || "";
+      inp.oninput = e => { values[k] = e.target.value; renderOut(); };
+    }
+    box.appendChild(f);
+  });
+}
+
+function renderOut(){
+  const t = tpl();
+  $("#subj").textContent = fill(t.subject);
+  if(!manual) $("#body").value = fill(t.body).replace(/\n{3,}/g, "\n\n");
+  $("#reset").hidden = !manual;
+  const ta = $("#body");
+  ta.style.height = "auto";
+  ta.style.height = Math.max(340, ta.scrollHeight) + "px";
+}
+
+function renderEditor(){
+  const t = tpl();
+  $("#tName").value = t.name; $("#tSubj").value = t.subject; $("#tBody").value = t.body;
+  $("#tstatus").textContent = "";
+}
+
+function renderAll(){ renderList(); renderFields(); renderOut(); renderEditor(); }
+
+/* ---------- ενέργειες ---------- */
+$("#body").addEventListener("input", () => { manual = true; $("#reset").hidden = false; });
+$("#reset").onclick = () => { manual = false; renderOut(); };
+
+$("#sig").oninput = e => { signature = e.target.value; renderOut(); save(); };
+
+function flash(el, msg){ el.textContent = msg; setTimeout(() => { el.textContent = ""; }, 2000); }
+async function copy(text, msg){
+  try{ await navigator.clipboard.writeText(text); flash($("#status"), msg); }
+  catch(e){
+    const ta = $("#body"); ta.select(); document.execCommand("copy");
+    flash($("#status"), "Αντιγράφηκε το κείμενο");
+  }
+}
+$("#copyBody").onclick = () => copy($("#body").value, "Αντιγράφηκε το κείμενο");
+$("#copySubj").onclick = () => copy($("#subj").textContent, "Αντιγράφηκε το θέμα");
+
+$("#addForm").onclick = () => {
+  const t = {id:"c"+Date.now(), name:"Νέα φόρμα", subject:"", body:"Καλησπέρα σας,\n\n\n\nΜε εκτίμηση,\n{{ypografi}}"};
+  templates.push(t); current = t.id; manual = false;
+  renderAll(); save();
+  document.querySelector("details.editor").open = true;
+  $("#tName").focus();
+};
+$("#saveT").onclick = () => {
+  const t = tpl();
+  t.name = $("#tName").value.trim() || "Χωρίς όνομα";
+  t.subject = $("#tSubj").value;
+  t.body = $("#tBody").value;
+  manual = false; save(); renderAll();
+  flash($("#tstatus"), "Αποθηκεύτηκε");
+};
+$("#delT").onclick = () => {
+  if(templates.length === 1){ flash($("#tstatus"), "Πρέπει να μείνει τουλάχιστον μία φόρμα"); return; }
+  templates = templates.filter(t => t.id !== current);
+  current = templates[0].id; manual = false;
+  save(); renderAll();
+};
+
+(async () => {
+  await load();
+  $("#sig").value = signature;
+  renderAll();
+})();
+</script>
