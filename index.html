@@ -26,6 +26,7 @@
   header p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
   .sig{margin-left:auto;display:flex;align-items:center;gap:8px}
   .sig label{font-size:13px;color:var(--muted)}
+  .sig label.act{color:var(--ink);cursor:pointer;font-size:14px}
 
   input[type=text],textarea,select{
     font:inherit;color:var(--ink);background:var(--paper);
@@ -86,6 +87,8 @@
   .crow{display:grid;grid-template-columns:1fr 165px;gap:6px}
   .crow select{padding:6px 8px;font-size:14px}
   .gblock input{padding:6px 8px;font-size:14px}
+  .imp{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+  .imp textarea{min-height:70px;font-size:13.5px;margin-bottom:6px}
   .seg{display:flex;gap:6px}
   .seg button{
     font:inherit;flex:1;background:var(--paper);border:1px solid var(--line);color:var(--muted);
@@ -135,6 +138,8 @@
     <div class="sig">
       <label for="sig">Υπογραφή</label>
       <input type="text" id="sig" placeholder="π.χ. Αλέξανδρος, Τμήμα Εξυπηρέτησης">
+      <label class="act" for="cat" id="catLabel" title="Φόρτωσε το αρχείο CSV με τα προϊόντα">Κατάλογος…</label>
+      <input type="file" id="cat" accept=".csv,text/csv" hidden>
     </div>
   </header>
 
@@ -330,6 +335,124 @@ const SECTIONS = {
 function num(text, single){
   return text.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, (_,a,b) => single ? a : b);
 }
+let catalog = null;   // normTitle -> [{brand,pack,slug,id}]
+let byId = null;      // κωδικός προϊόντος -> εγγραφή
+function normTitle(x){
+  return x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9α-ω ]+/g," ").replace(/\s+/g," ").trim();
+}
+function parseCsv(text){
+  const rows = [];
+  text.split("\n").forEach(line => {
+    if(!line.trim() || line.trim().startsWith("<br") || line.includes("Deprecated")) return;
+    const out = []; let cur = "", q = false;
+    for(let i = 0; i < line.length; i++){
+      const ch = line[i];
+      if(ch === '"'){ if(q && line[i+1] === '"'){ cur += '"'; i++; } else q = !q; }
+      else if(ch === "," && !q){ out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    rows.push(out);
+  });
+  return rows;
+}
+function loadCatalog(text){
+  const rows = parseCsv(text);
+  const head = rows.shift() || [];
+  const col = n => head.indexOf(n);
+  const ci = {id:col("id"), brand:col("brand"), title:col("title"), pack:col("pack"), url:col("url")};
+  if(ci.title < 0 || ci.url < 0) return 0;
+  const map = new Map(), ids = new Map();
+  rows.forEach(r => {
+    const title = r[ci.title], url = r[ci.url];
+    if(!title || !url) return;
+    const rec = {title:title, brand:r[ci.brand] || "", pack:r[ci.pack] || "", slug:url, id:r[ci.id] || ""};
+    const k = normTitle(title);
+    if(!map.has(k)) map.set(k, []);
+    map.get(k).push(rec);
+    if(rec.id) ids.set(rec.id, rec);
+  });
+  catalog = map; byId = ids;
+  return map.size;
+}
+function recName(rec){
+  const pack = (rec.pack || "").split(",").map(x => x.trim()).filter(x => x && !/Δόσ/i.test(x)).join(", ");
+  return rec.title + (pack ? " – " + pack : "");
+}
+function recLink(rec){ return rec.id ? "https://fit1.gr/" + rec.id : "https://fit1.gr/" + rec.slug; }
+const firstNum = x => { const m = (x || "").match(/\d+/); return m ? m[0] : ""; };
+function findLink(base, brand, detail){
+  if(!catalog) return "";
+  let c = catalog.get(normTitle(base));
+  if(!c || !c.length) return "";
+  if(c.length > 1 && brand){
+    const nb = normTitle(brand);
+    const byBrand = c.filter(x => normTitle(x.brand) === nb || normTitle(x.brand).includes(nb) || nb.includes(normTitle(x.brand)));
+    if(byBrand.length) c = byBrand;
+  }
+  if(c.length > 1 && detail){
+    const n = firstNum(detail);
+    const byPack = c.filter(x => firstNum(x.pack) === n);
+    if(byPack.length) c = byPack;
+  }
+  return recLink(c[0]);
+}
+
+const SKIP_LINE = /τμχ\.|Τιμή μονάδας|Σύνολο:|Έκπτωση:|^Δώρο$/;
+// Μορφή σελίδας παραγγελίας: μπλοκ με μάρκα / όνομα / μέγεθος-γεύση / τιμή
+function parseOrder(text){
+  return text.split(/\n[ \t]*\n/).map(b => {
+    const lines = b.split("\n").map(l => l.trim()).filter(l => l && !SKIP_LINE.test(l));
+    if(!lines.length) return null;
+    const brand = lines.length > 1 ? lines[0] : "";
+    const name = lines.length > 1 ? lines[1] : lines[0];
+    let detail = "";
+    if(lines.length > 2){
+      detail = lines[2].split(",").map(x => x.trim()).filter(x => x && !/Δόσ/i.test(x)).join(", ");
+    }
+    return {n: name + (detail ? " – " + detail : ""), l: findLink(name, brand, detail)};
+  }).filter(Boolean);
+}
+// Απλή μορφή: ένα προϊόν ή link ανά γραμμή
+function parseSimple(text){
+  return text.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    // σκέτος κωδικός προϊόντος
+    if(/^\d{3,7}$/.test(l)){
+      if(!byId) return {n:"[φόρτωσε πρώτα τον κατάλογο — κουμπί «Κατάλογος…» πάνω δεξιά]", l:""};
+      const rec = byId.get(l);
+      return rec ? {n:recName(rec), l:recLink(rec)} : {n:"[δεν βρέθηκε ο κωδικός " + l + "]", l:""};
+    }
+    const m = l.match(/(https?:\/\/\S+)/);
+    const link = m ? m[1] : "";
+    let name = (m ? l.replace(m[1], "") : l).replace(/[\s\u2013\u2014\-|,;:]+$/,"").replace(/^[\s\u2013\u2014\-|]+/,"").trim();
+    if(!name && link){
+      const seg = link.split("?")[0].split("/").filter(Boolean).pop() || "";
+      name = decodeURIComponent(seg).replace(/-/g," ").replace(/\s*\d+$/,"").trim();
+    }
+    return {n:name, l:link};
+  }).filter(r => r.n || r.l);
+}
+function parseLines(text){
+  return /τμχ\.|Τιμή μονάδας/.test(text) ? parseOrder(text) : parseSimple(text);
+}
+function importBox(f, onImport){
+  const box = document.createElement("div");
+  box.className = "imp";
+  box.innerHTML = '<textarea placeholder="Επικόλλησε τα προϊόντα από την παραγγελία — ή γράψε σκέτους κωδικούς προϊόντων, έναν ανά γραμμή"></textarea>'
+    + '<button class="act">Εισαγωγή προϊόντων</button>';
+  const ta = box.querySelector("textarea");
+  box.querySelector("button").onclick = () => {
+    if(!catalog && /^[\s\d\n]+$/.test(ta.value) && ta.value.trim()){
+      flash($("#status"), "Δεν έχει φορτωθεί ο κατάλογος προϊόντων");
+    }
+    const rows = parseLines(ta.value);
+    if(!rows.length){ flash($("#status"), "Δεν βρέθηκαν προϊόντα στο κείμενο"); return; }
+    onImport(rows); ta.value = "";
+    renderFields(); renderOut();
+  };
+  f.appendChild(box);
+}
 function comboLine(c){
   let line = "• " + (c.n.trim() || c.l.trim());
   if(c.n.trim() && c.l.trim()) line += " – " + c.l.trim();
@@ -358,7 +481,7 @@ const $ = s => document.querySelector(s);
 /* ---------- αποθήκευση ---------- */
 async function load(){
   try{
-    const r = await window.storage.get("forms_v9");
+    const r = await window.storage.get("forms_v10");
     if(r && r.value){
       const d = JSON.parse(r.value);
       if(Array.isArray(d.templates) && d.templates.length) templates = d.templates;
@@ -368,7 +491,7 @@ async function load(){
     }
   }catch(e){ /* πρώτη χρήση */ }
   try{
-    const old = await window.storage.get("forms_v8");
+    const old = await window.storage.get("forms_v9");
     if(old && old.value){
       const d = JSON.parse(old.value);
       if(typeof d.signature === "string") signature = d.signature;
@@ -376,7 +499,7 @@ async function load(){
   }catch(e){}
 }
 async function save(){
-  try{ await window.storage.set("forms_v9", JSON.stringify({templates, signature})); }catch(e){}
+  try{ await window.storage.set("forms_v10", JSON.stringify({templates, signature})); }catch(e){}
 }
 
 /* ---------- βοηθητικά ---------- */
@@ -475,6 +598,10 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { items.push({n:"",l:"",t:"",u:"ημέρες"}); renderFields(); };
       f.appendChild(add);
+      importBox(f, rows => {
+        if(items.length === 1 && !items[0].n && !items[0].l) items = [];
+        rows.forEach(r => items.push({n:r.n, l:r.l, t:"", u:"ημέρες"}));
+      });
     } else if(k === "provlimata"){
       f.innerHTML = '<label>Προϊόντα και τι συμβαίνει στο καθένα</label><div class="rows"></div>';
       const rows = f.querySelector(".rows");
@@ -521,6 +648,10 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { cItems.push({n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}); renderFields(); };
       f.appendChild(add);
+      importBox(f, rows => {
+        if(cItems.length === 1 && !cItems[0].n && !cItems[0].l) cItems = [];
+        rows.forEach(r => cItems.push({n:r.n, l:r.l, type:"elleipsi", t:"", u:"ημέρες", f:""}));
+      });
     } else if(k === "gefseis"){
       f.innerHTML = '<label>Προϊόντα και διαθέσιμες γεύσεις</label><div class="rows"></div>';
       const rows = f.querySelector(".rows");
@@ -543,6 +674,10 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { gItems.push({n:"",f:""}); renderFields(); };
       f.appendChild(add);
+      importBox(f, rows => {
+        if(gItems.length === 1 && !gItems[0].n) gItems = [];
+        rows.forEach(r => gItems.push({n:r.n || r.l, f:""}));
+      });
     } else if(k === "prosfonisi"){
       if(!values.prosfonisi) values.prosfonisi = "Αγαπητέ";
       f.innerHTML = '<label>Προσφώνηση</label><div class="seg"></div>';
@@ -596,6 +731,24 @@ function renderAll(){ renderList(); renderFields(); renderOut(); renderEditor();
 /* ---------- ενέργειες ---------- */
 $("#body").addEventListener("input", () => { manual = true; $("#reset").hidden = false; });
 $("#reset").onclick = () => { manual = false; renderOut(); };
+
+$("#cat").onchange = e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  $("#catLabel").textContent = "Φόρτωση…";
+  const r = new FileReader();
+  r.onload = () => {
+    const n = loadCatalog(r.result);
+    $("#catLabel").textContent = n ? n.toLocaleString("el-GR") + " προϊόντα" : "Δεν διαβάστηκε";
+  };
+  r.readAsText(file, "utf-8");
+};
+// αν το αρχείο βρίσκεται δίπλα στη σελίδα (GitHub Pages), φορτώνεται μόνο του
+fetch("f1_export_all_gr.csv").then(r => r.ok ? r.text() : null).then(t => {
+  if(!t) return;
+  const n = loadCatalog(t);
+  if(n) $("#catLabel").textContent = n.toLocaleString("el-GR") + " προϊόντα";
+}).catch(() => {});
 
 $("#sig").oninput = e => { signature = e.target.value; renderOut(); save(); };
 
