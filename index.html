@@ -69,6 +69,10 @@
   .field{margin-bottom:13px}
   .field:last-child{margin-bottom:0}
   .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  .field label.chk{display:flex;align-items:center;gap:8px;color:var(--ink);cursor:pointer;font-size:14px;margin-bottom:7px}
+  .field label.chk input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .gblock label.chk.sm{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;margin:1px 0 0}
+  .gblock label.chk.sm input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
 
   .rows{display:flex;flex-direction:column;gap:8px}
   .row{display:grid;grid-template-columns:1fr 1fr 190px 28px;gap:6px;align-items:center}
@@ -190,10 +194,10 @@
 const DEFAULTS = [
   {
     id:"combo", name:"Ενημέρωση παραγγελίας",
-    subject:"Σχετικά με την παραγγελία σας",
+    subject:"Σχετικά με την παραγγελία σας{{parangelia}}",
     body:`Καλησπέρα σας,
 
-Σας ευχαριστούμε για την παραγγελία σας. Θα θέλαμε να σας ενημερώσουμε για τα εξής:
+Σας ευχαριστούμε για την παραγγελία σας{{parangelia}}. Θα θέλαμε να σας ενημερώσουμε για τα εξής:
 
 {{provlimata}}
 
@@ -260,11 +264,20 @@ let items = [{n:"",l:"",t:"",u:"ημέρες"}]; // γραμμές προϊόν�
 let gItems = [{n:"",f:""}];               // προϊόντα με επιλογές γεύσης
 let cItems = [{n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}]; // συνδυαστικό
 const TYPES = {elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
+let payMode = "cod";   // cod = αντικαταβολή, paid = εξοφλημένη
+const PAY = {
+  cod:  "χωρίς να χρεωθείτε το αντίστοιχο ποσό",
+  paid: "και να σας επιστρέψουμε το αντίστοιχο ποσό"
+};
 
 const SECTIONS = {
   elleipsi: {
     intro:"[[Το παρακάτω προϊόν της παραγγελίας σας δεν είναι διαθέσιμο|Τα παρακάτω προϊόντα της παραγγελίας σας δεν είναι διαθέσιμα]]:",
-    outro:"Μπορούμε είτε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας και να σας επιστρέψουμε το αντίστοιχο ποσό, είτε να [[το|τα]] αντικαταστήσουμε με [[κάποιο άλλο προϊόν|κάποια άλλα προϊόντα]] της επιλογής σας."
+    outro:"Μπορούμε είτε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας {{POSO}}, είτε να [[το|τα]] αντικαταστήσουμε με [[κάποιο άλλο προϊόν|κάποια άλλα προϊόντα]] της επιλογής σας."
+  },
+  elleipsiNoAlt: {
+    intro:"[[Το παρακάτω προϊόν δεν είναι διαθέσιμο και δεν διαθέτουμε|Τα παρακάτω προϊόντα δεν είναι διαθέσιμα και δεν διαθέτουμε]] αυτή τη στιγμή [[κάποιο αντίστοιχο προϊόν|αντίστοιχα προϊόντα]] για αντικατάσταση:",
+    outro:"Μπορούμε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας {{POSO}}, ή να ακυρώσουμε ολόκληρη την παραγγελία, εφόσον το επιθυμείτε."
   },
   anamoni: {
     intro:"[[Το παρακάτω προϊόν αναμένεται να παραληφθεί από εμάς|Τα παρακάτω προϊόντα αναμένονται να παραληφθούν από εμάς]]:",
@@ -275,6 +288,13 @@ const SECTIONS = {
     outro:"Παρακαλούμε ενημερώστε μας [[ποια γεύση επιθυμείτε|ποιες γεύσεις επιθυμείτε]]."
   }
 };
+// σειρά εμφάνισης και ποια προϊόντα ανήκουν σε κάθε παράγραφο
+const GROUPS = [
+  {sec:"elleipsi",      pick: c => c.type === "elleipsi" && !c.na},
+  {sec:"elleipsiNoAlt", pick: c => c.type === "elleipsi" && c.na},
+  {sec:"anamoni",       pick: c => c.type === "anamoni"},
+  {sec:"gefsi",         pick: c => c.type === "gefsi"}
+];
 
 function num(text, single){
   return text.replace(/\[\[([^\]|]*)\|([^\]]*)\]\]/g, (_,a,b) => single ? a : b);
@@ -318,7 +338,7 @@ function loadCatalog(text){
     if(rec.id) ids.set(rec.id, rec);
   });
   catalog = map; byId = ids;
-  return map.size;
+  return ids.size;
 }
 function recName(rec){
   const pack = (rec.pack || "").split(",").map(x => x.trim()).filter(x => x && !/Δόσ/i.test(x)).join(", ");
@@ -409,11 +429,12 @@ function comboLine(c){
 }
 function comboText(){
   const parts = [];
-  ["elleipsi","anamoni","gefsi"].forEach(type => {
-    const rows = cItems.filter(c => c.type === type && (c.n.trim() || c.l.trim()));
+  GROUPS.forEach(g => {
+    const rows = cItems.filter(c => g.pick(c) && (c.n.trim() || c.l.trim()));
     if(!rows.length) return;
-    const single = rows.length === 1, sec = SECTIONS[type];
-    parts.push(num(sec.intro, single) + "\n\n" + rows.map(comboLine).join("\n") + "\n\n" + num(sec.outro, single));
+    const single = rows.length === 1, sec = SECTIONS[g.sec];
+    parts.push(num(sec.intro, single) + "\n\n" + rows.map(comboLine).join("\n")
+      + "\n\n" + num(sec.outro, single).replace("{{POSO}}", PAY[payMode]));
   });
   return parts.join("\n\n");
 }
@@ -485,6 +506,10 @@ function fill(text){
     if(k === "gefseis") return gefseisText() || "[προϊόντα και γεύσεις]";
     if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
     if(k === "ypografi") return signature.trim() || "[υπογραφή]";
+    if(k === "parangelia"){
+      const v = (values.parangelia || "").trim();
+      return v ? " με αριθμό " + v : "";
+    }
     if(k === "diastima") return durValue() || "[χρόνος αναμονής]";
     const v = (values[k] || "").trim();
     return v || "[" + (LABELS[k] || k) + "]";
@@ -547,11 +572,16 @@ function renderFields(){
         rows.forEach(r => items.push({n:r.n, l:r.l, t:"", u:"ημέρες"}));
       });
     } else if(k === "provlimata"){
-      f.innerHTML = '<label>Προϊόντα και τι συμβαίνει στο καθένα</label><div class="rows"></div>';
+      f.innerHTML = '<label class="chk"><input type="checkbox" id="paid"> Πληρωμένη παραγγελία (όχι αντικαταβολή)</label>'
+        + '<label style="margin-top:11px">Προϊόντα και τι συμβαίνει στο καθένα</label><div class="rows"></div>';
+      const chk = f.querySelector("#paid");
+      chk.checked = payMode === "paid";
+      chk.onchange = e => { payMode = e.target.checked ? "paid" : "cod"; renderOut(); };
       const rows = f.querySelector(".rows");
       cItems.forEach((c, idx) => {
         const blk = document.createElement("div"); blk.className = "gblock";
         let extra = "";
+        if(c.type === "elleipsi") extra = '<label class="chk sm"><input type="checkbox" class="na"> Δεν υπάρχει αντίστοιχο για αντικατάσταση</label>';
         if(c.type === "anamoni") extra = '<div class="dur"><input type="text" placeholder="π.χ. 2–3"><button type="button" title="Άλλαξε μονάδα"></button></div>';
         if(c.type === "gefsi") extra = '<input type="text" class="fl" placeholder="Γεύσεις, χωρισμένες με κόμμα">';
         blk.innerHTML = '<div class="gtop"><input type="text" placeholder="Όνομα προϊόντος"><button class="del" title="Διαγραφή">×</button></div>'
@@ -574,6 +604,11 @@ function renderFields(){
           t.value = c.t; u.textContent = c.u;
           t.oninput = e => { c.t = e.target.value; renderOut(); };
           u.onclick = () => { c.u = UNITS[(UNITS.indexOf(c.u) + 1) % UNITS.length]; u.textContent = c.u; renderOut(); };
+        }
+        if(c.type === "elleipsi"){
+          const na = blk.querySelector(".na");
+          na.checked = !!c.na;
+          na.onchange = e => { c.na = e.target.checked; renderOut(); };
         }
         if(c.type === "gefsi"){
           const fl = blk.querySelector(".fl");
