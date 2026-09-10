@@ -256,8 +256,8 @@ let current = templates[0].id;
 let values = {};            // token -> string
 let items = [{n:"",l:"",t:"",u:"ημέρες"}]; // γραμμές προϊόντων
 let gItems = [{n:"",f:""}];               // προϊόντα με επιλογές γεύσης
-let cItems = [{n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}]; // συνδυαστικό
-const TYPES = {elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
+let cItems = [{n:"",l:"",type:"none",t:"",u:"ημέρες",f:""}];     // συνδυαστικό
+const TYPES = {none:"Χωρίς πρόβλημα", elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
 let toAddr = "";       // email πελάτη
 let payMode = "cod";   // cod = αντικαταβολή, paid = εξοφλημένη
 const PAY = {
@@ -392,25 +392,106 @@ function parseSimple(text){
     return {n:name, l:link};
   }).filter(r => r.n || r.l);
 }
+// Μορφή σελίδας διαχείρισης: αριθμός παραγγελίας, στοιχεία πελάτη και προϊόντα
+function parseAdmin(text){
+  const flat = text.split("\n").map(l => l.trim());
+  const joined = flat.join("\n");
+  const meta = {
+    order: (joined.match(/#(\d{5,})/) || [])[1] || "",
+    email: (joined.match(/[\w.+-]+@[\w-]+\.[\w.]+/) || [])[0] || "",
+    name: ""
+  };
+  for(let i = 0; i < flat.length; i++){
+    if(/#\d{5,}/.test(flat[i])){
+      const nx = (flat[i+1] || "").replace(/\s+\d+$/,"").trim();
+      if(nx && !/@/.test(nx)) meta.name = nx;
+      break;
+    }
+  }
+  const rows = [];
+  flat.forEach((l, i) => {
+    if(!/W:\s*\d+/.test(l) || /^W:/.test(l)) return;
+    let title = "", brand = "", pack = "";
+    const br = l.match(/^(.*?)\s*\[(.*?)\]\s*W:/);
+    if(br){ title = br[1].trim(); pack = br[2]; brand = flat[i-1] || ""; }
+    else { pack = l.replace(/,?\s*W:.*$/,""); title = flat[i-1] || ""; brand = flat[i-2] || ""; }
+    if(/^\d+\s*x$/.test(brand)) brand = "";
+    let qty = "";
+    for(let j = i-1; j >= Math.max(0, i-4); j--){
+      const m = (flat[j] || "").match(/^(\d+)\s*x$/);
+      if(m){ qty = m[1]; break; }
+    }
+    const detail = pack.split(",").map(x => x.trim())
+      .filter(x => x && !/Δόσ/i.test(x) && !/^W:/.test(x)).join(", ");
+    if(!title) return;
+    rows.push({
+      n: title + (detail ? " – " + detail : "") + (qty && qty !== "1" ? " ×" + qty : ""),
+      l: findLink(title, brand, detail)
+    });
+  });
+  return {rows, meta};
+}
+// Δεδομένα από το bookmarklet της σελίδας διαχείρισης
+function cleanName(line){
+  let n = line.replace(/^\s*\d+\s*x\s*/i, "").trim();
+  n = n.replace(/\[([^\]]*)\]/, (_, inner) => {
+    const parts = inner.split(",").map(x => x.trim()).filter(x => x && !/Δόσ/i.test(x));
+    return parts.length ? "– " + parts.join(", ") : "";
+  });
+  return n.replace(/\s{2,}/g, " ").replace(/\s+–\s*$/,"").trim();
+}
+function parseF1(text){
+  let d;
+  try{ d = JSON.parse(text); }catch(e){ return null; }
+  if(!d || !d.f1order) return null;
+  const o = d.f1order;
+  const rows = (o.items || []).map(it => ({
+    n: cleanName(it.name || "") + (it.qty > 1 ? " ×" + it.qty : ""),
+    l: it.link || "",
+    missing: !!it.missing
+  }));
+  return {rows, meta:{order:o.order || "", email:o.email || "", name:o.name || ""}};
+}
+function parseAny(text){
+  const f1 = parseF1(text.trim());
+  if(f1) return f1;
+  if(/W:\s*\d+/.test(text)) return parseAdmin(text);
+  return {rows: parseLines(text), meta: null};
+}
 function parseLines(text){
   return /τμχ\.|Τιμή μονάδας/.test(text) ? parseOrder(text) : parseSimple(text);
 }
 function importBox(f, onImport){
   const box = document.createElement("div");
   box.className = "imp";
-  box.innerHTML = '<textarea placeholder="Επικόλλησε τα προϊόντα από την παραγγελία — ή γράψε σκέτους κωδικούς προϊόντων, έναν ανά γραμμή"></textarea>'
+  box.innerHTML = '<textarea placeholder="Επικόλλησε ολόκληρη την παραγγελία από τη σελίδα διαχείρισης — ή σκέτους κωδικούς προϊόντων, έναν ανά γραμμή"></textarea>'
     + '<button class="act">Εισαγωγή προϊόντων</button>';
   const ta = box.querySelector("textarea");
   box.querySelector("button").onclick = () => {
     if(!catalog && /^[\s\d\n]+$/.test(ta.value) && ta.value.trim()){
       flash($("#status"), "Δεν έχει φορτωθεί ο κατάλογος προϊόντων");
     }
-    const rows = parseLines(ta.value);
-    if(!rows.length){ flash($("#status"), "Δεν βρέθηκαν προϊόντα στο κείμενο"); return; }
-    onImport(rows); ta.value = "";
+    const res = parseAny(ta.value);
+    if(!res.rows.length){ flash($("#status"), "Δεν βρέθηκαν προϊόντα στο κείμενο"); return; }
+    if(res.meta){
+      if(res.meta.order) values.parangelia = res.meta.order;
+      if(res.meta.email) toAddr = res.meta.email;
+      if(res.meta.name) values.pelatis = res.meta.name;
+    }
+    onImport(res.rows); ta.value = "";
     renderFields(); renderOut();
   };
   f.appendChild(box);
+}
+// εναλλακτικά προϊόντα: links ή κωδικοί, χωρισμένα με κόμμα ή κενό
+function altList(txt){
+  return (txt || "").split(/[,\n\s]+/).map(x => x.trim()).filter(Boolean).map(x => {
+    if(/^\d{3,7}$/.test(x)){
+      const rec = byId && byId.get(x);
+      return rec ? recName(rec) + " – " + recLink(rec) : "https://fit1.gr/" + x;
+    }
+    return x;
+  });
 }
 function comboLine(c){
   let line = "• " + (c.n.trim() || c.l.trim());
@@ -419,6 +500,11 @@ function comboLine(c){
   if(c.type === "gefsi"){
     const fl = c.f.split(",").map(x => x.trim()).filter(Boolean);
     if(fl.length) line += "\n" + fl.map(x => "   – " + x).join("\n");
+  }
+  if(c.type === "elleipsi"){
+    const alts = altList(c.alt);
+    if(alts.length === 1) line += "\n   Προτεινόμενη εναλλακτική: " + alts[0];
+    else if(alts.length > 1) line += "\n   Προτεινόμενες εναλλακτικές:\n" + alts.map(x => "      – " + x).join("\n");
   }
   return line;
 }
@@ -579,7 +665,8 @@ function renderFields(){
       cItems.forEach((c, idx) => {
         const blk = document.createElement("div"); blk.className = "gblock";
         let extra = "";
-        if(c.type === "elleipsi") extra = '<label class="chk sm"><input type="checkbox" class="na"> Δεν υπάρχει αντίστοιχο για αντικατάσταση</label>';
+        if(c.type === "elleipsi") extra = '<input type="text" class="alt" placeholder="Εναλλακτικά προϊόντα — links ή κωδικοί, χωρισμένα με κόμμα">'
+          + '<label class="chk sm"><input type="checkbox" class="na"> Δεν υπάρχει αντίστοιχο για αντικατάσταση</label>';
         if(c.type === "anamoni") extra = '<div class="dur"><input type="text" placeholder="π.χ. 2–3"><button type="button" title="Άλλαξε μονάδα"></button></div>';
         if(c.type === "gefsi") extra = '<input type="text" class="fl" placeholder="Γεύσεις, χωρισμένες με κόμμα">';
         blk.innerHTML = '<div class="gtop"><input type="text" placeholder="Όνομα προϊόντος"><button class="del" title="Διαγραφή">×</button></div>'
@@ -604,6 +691,9 @@ function renderFields(){
           u.onclick = () => { c.u = UNITS[(UNITS.indexOf(c.u) + 1) % UNITS.length]; u.textContent = c.u; renderOut(); };
         }
         if(c.type === "elleipsi"){
+          const alt = blk.querySelector(".alt");
+          alt.value = c.alt || "";
+          alt.oninput = e => { c.alt = e.target.value; renderOut(); };
           const na = blk.querySelector(".na");
           na.checked = !!c.na;
           na.onchange = e => { c.na = e.target.checked; renderOut(); };
@@ -615,7 +705,7 @@ function renderFields(){
         }
         blk.querySelector(".del").onclick = () => {
           cItems.splice(idx,1);
-          if(!cItems.length) cItems.push({n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""});
+          if(!cItems.length) cItems.push({n:"",l:"",type:"none",t:"",u:"ημέρες",f:""});
           renderFields(); renderOut();
         };
         rows.appendChild(blk);
@@ -623,11 +713,12 @@ function renderFields(){
       const add = document.createElement("button");
       add.className = "act"; add.textContent = "+ Προϊόν";
       add.style.marginTop = "8px";
-      add.onclick = () => { cItems.push({n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}); renderFields(); };
+      add.onclick = () => { cItems.push({n:"",l:"",type:"none",t:"",u:"ημέρες",f:""}); renderFields(); };
       f.appendChild(add);
       importBox(f, rows => {
         if(cItems.length === 1 && !cItems[0].n && !cItems[0].l) cItems = [];
-        rows.forEach(r => cItems.push({n:r.n, l:r.l, type:"elleipsi", t:"", u:"ημέρες", f:""}));
+        rows.forEach(r => cItems.push({n:r.n, l:r.l, type: r.missing ? "elleipsi" : "none",
+          t:"", u:"ημέρες", f:"", na:false, alt:""}));
       });
     } else if(k === "gefseis"){
       f.innerHTML = '<label>Προϊόντα και διαθέσιμες γεύσεις</label><div class="rows"></div>';
