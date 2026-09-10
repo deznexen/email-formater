@@ -113,7 +113,6 @@
   }
   #body:focus{outline:none}
   .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:11px 14px;border-top:1px solid var(--line-soft)}
-  .toolbar #to{width:190px;font-size:13.5px;padding:6px 9px}
   .note{font-size:12.5px;color:var(--amber);background:var(--amber-soft);padding:2px 8px;border-radius:20px}
   .ok{font-size:13px;color:var(--accent)}
   mark{background:var(--amber-soft);color:var(--amber);padding:0 2px}
@@ -141,8 +140,6 @@
       <p>Διάλεξε φόρμα, συμπλήρωσε τα πεδία, αντίγραψε το έτοιμο κείμενο.</p>
     </div>
     <div class="sig">
-      <label for="sig">Υπογραφή</label>
-      <input type="text" id="sig" placeholder="π.χ. Αλέξανδρος, Τμήμα Εξυπηρέτησης">
       <label class="act" for="cat" id="catLabel" title="Φόρτωσε το αρχείο CSV με τα προϊόντα">Κατάλογος…</label>
       <input type="file" id="cat" accept=".csv,text/csv" hidden>
     </div>
@@ -169,7 +166,6 @@
       <div class="toolbar">
         <button class="act primary" id="copyBody">Αντιγραφή κειμένου</button>
         <button class="act" id="openMail">Άνοιγμα στο Thunderbird</button>
-        <input type="text" id="to" placeholder="Προς (προαιρετικό)">
         <button class="act" id="reset" hidden>Επαναφορά από τα πεδία</button>
         <span id="status" class="ok" aria-live="polite"></span>
       </div>
@@ -179,7 +175,7 @@
   <details class="editor">
     <summary>Επεξεργασία της φόρμας</summary>
     <div class="body">
-      <p class="hint">Γράψε το κείμενο όπως θέλεις. Όπου βάλεις <code>{{proionta}}</code> μπαίνει η λίστα προϊόντων, <code>{{diastima}}</code> ο χρόνος αναμονής, <code>{{pelatis}}</code> το όνομα, <code>{{parangelia}}</code> ο αριθμός παραγγελίας, <code>{{ypografi}}</code> η υπογραφή. Τα πεδία αριστερά προσαρμόζονται μόνα τους.<br>Για ενικό/πληθυντικό γράψε <code>[[ενικός|πληθυντικός]]</code> — π.χ. <code>[[το προϊόν αναμένεται|τα προϊόντα αναμένονται]]</code>. Όταν υπάρχει ένα μόνο προϊόν μπαίνει το πρώτο, αλλιώς το δεύτερο.</p>
+      <p class="hint">Γράψε το κείμενο όπως θέλεις. Όπου βάλεις <code>{{proionta}}</code> μπαίνει η λίστα προϊόντων, <code>{{diastima}}</code> ο χρόνος αναμονής, <code>{{pelatis}}</code> το όνομα, <code>{{parangelia}}</code> ο αριθμός παραγγελίας. Τα πεδία αριστερά προσαρμόζονται μόνα τους.<br>Για ενικό/πληθυντικό γράψε <code>[[ενικός|πληθυντικός]]</code> — π.χ. <code>[[το προϊόν αναμένεται|τα προϊόντα αναμένονται]]</code>. Όταν υπάρχει ένα μόνο προϊόν μπαίνει το πρώτο, αλλιώς το δεύτερο.</p>
       <div class="field"><label for="tName">Όνομα φόρμας</label><input type="text" id="tName"></div>
       <div class="field"><label for="tSubj">Θέμα</label><input type="text" id="tSubj"></div>
       <div class="field"><label for="tBody">Κείμενο</label><textarea id="tBody"></textarea></div>
@@ -205,8 +201,7 @@ const DEFAULTS = [
 
 Σας ευχαριστούμε πολύ για την κατανόηση.
 
-Με εκτίμηση,
-{{ypografi}}`
+Με εκτίμηση,`
   },
   {
     id:"epistrofi", name:"Επιστροφή προϊόντος",
@@ -233,8 +228,7 @@ const DEFAULTS = [
 
 Για οποιαδήποτε απορία, είμαστε στη διάθεσή σας.
 
-Φιλικά,
-{{ypografi}}`
+Φιλικά,`
   }
 ];
 
@@ -264,6 +258,7 @@ let items = [{n:"",l:"",t:"",u:"ημέρες"}]; // γραμμές προϊόν�
 let gItems = [{n:"",f:""}];               // προϊόντα με επιλογές γεύσης
 let cItems = [{n:"",l:"",type:"elleipsi",t:"",u:"ημέρες",f:""}]; // συνδυαστικό
 const TYPES = {elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
+let toAddr = "";       // email πελάτη
 let payMode = "cod";   // cod = αντικαταβολή, paid = εξοφλημένη
 const PAY = {
   cod:  "χωρίς να χρεωθείτε το αντίστοιχο ποσό",
@@ -439,7 +434,6 @@ function comboText(){
   return parts.join("\n\n");
 }
 let manual = false;         // ο χρήστης πείραξε το κείμενο
-let signature = "";
 
 const $ = s => document.querySelector(s);
 
@@ -450,7 +444,6 @@ async function load(){
     if(r && r.value){
       const d = JSON.parse(r.value);
       if(Array.isArray(d.templates) && d.templates.length) templates = d.templates;
-      if(typeof d.signature === "string") signature = d.signature;
       if(!templates.some(t => t.id === current)) current = templates[0].id;
       return;
     }
@@ -459,12 +452,11 @@ async function load(){
     const old = await window.storage.get("forms_v10");
     if(old && old.value){
       const d = JSON.parse(old.value);
-      if(typeof d.signature === "string") signature = d.signature;
     }
   }catch(e){}
 }
 async function save(){
-  try{ await window.storage.set("forms_v11", JSON.stringify({templates, signature})); }catch(e){}
+  try{ await window.storage.set("forms_v11", JSON.stringify({templates})); }catch(e){}
 }
 
 /* ---------- βοηθητικά ---------- */
@@ -505,7 +497,6 @@ function fill(text){
     if(k === "proionta") return listText() || "[λίστα προϊόντων]";
     if(k === "gefseis") return gefseisText() || "[προϊόντα και γεύσεις]";
     if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
-    if(k === "ypografi") return signature.trim() || "[υπογραφή]";
     if(k === "parangelia"){
       const v = (values.parangelia || "").trim();
       return v ? " με αριθμό " + v : "";
@@ -533,8 +524,15 @@ function renderFields(){
   const t = tpl(), box = $("#fields");
   box.innerHTML = "";
   $("#fieldsTitle").textContent = "Στοιχεία — " + t.name;
-  const ks = tokens(t).filter(k => k !== "ypografi");
-  if(!ks.length){ box.innerHTML = '<p class="hint">Αυτή η φόρμα δεν έχει πεδία. Το κείμενο είναι έτοιμο δεξιά.</p>'; return; }
+  const mail = document.createElement("div");
+  mail.className = "field";
+  mail.innerHTML = '<label for="to">Email πελάτη</label><input type="text" id="to" placeholder="π.χ. pelatis@example.com">';
+  const mi = mail.querySelector("input");
+  mi.value = toAddr;
+  mi.oninput = e => { toAddr = e.target.value; };
+  box.appendChild(mail);
+
+  const ks = tokens(t);
 
   ks.forEach(k => {
     const f = document.createElement("div"); f.className = "field";
@@ -729,7 +727,6 @@ fetch("f1_export_all_gr.csv").then(r => r.ok ? r.text() : null).then(t => {
   if(n) $("#catLabel").textContent = n.toLocaleString("el-GR") + " προϊόντα";
 }).catch(() => {});
 
-$("#sig").oninput = e => { signature = e.target.value; renderOut(); save(); };
 
 function flash(el, msg){ el.textContent = msg; setTimeout(() => { el.textContent = ""; }, 2000); }
 async function copy(text, msg){
@@ -741,7 +738,7 @@ async function copy(text, msg){
 }
 $("#copyBody").onclick = () => copy($("#body").value, "Αντιγράφηκε το κείμενο");
 $("#openMail").onclick = () => {
-  const url = "mailto:" + encodeURIComponent($("#to").value.trim())
+  const url = "mailto:" + encodeURIComponent(toAddr.trim())
     + "?subject=" + encodeURIComponent($("#subj").textContent)
     + "&body=" + encodeURIComponent($("#body").value);
   if(url.length > 1900) flash($("#status"), "Μεγάλο κείμενο — αν κοπεί, χρησιμοποίησε αντιγραφή");
@@ -749,7 +746,7 @@ $("#openMail").onclick = () => {
 };
 
 $("#addForm").onclick = () => {
-  const t = {id:"c"+Date.now(), name:"Νέα φόρμα", subject:"", body:"Καλησπέρα σας,\n\n\n\nΜε εκτίμηση,\n{{ypografi}}"};
+  const t = {id:"c"+Date.now(), name:"Νέα φόρμα", subject:"", body:"Καλησπέρα σας,\n\n\n\nΜε εκτίμηση,"};
   templates.push(t); current = t.id; manual = false;
   renderAll(); save();
   document.querySelector("details.editor").open = true;
@@ -772,7 +769,6 @@ $("#delT").onclick = () => {
 
 (async () => {
   await load();
-  $("#sig").value = signature;
   renderAll();
 })();
 </script>
