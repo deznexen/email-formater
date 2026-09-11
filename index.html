@@ -511,7 +511,7 @@ function comboLine(c){
   if(c.type === "anamoni" && c.t.trim()) line += " (αναμένεται σε " + c.t.trim() + " " + unitFor(c.t, c.u) + ")";
   if(c.type === "gefsi"){
     const fl = c.f.split(",").map(x => x.trim()).filter(Boolean);
-    if(fl.length) line += "\n" + fl.map(x => "   – " + x).join("\n");
+    if(fl.length) line += "\n" + fl.map((x, i) => "   " + (i+1) + ". " + x).join("\n");
   }
   if(c.type === "elleipsi"){
     const alts = altList(c.alt);
@@ -580,7 +580,7 @@ function gefseisText(){
   return rows.map(g => {
     let block = "• " + g.n.trim();
     const fl = g.f.split(",").map(x => x.trim()).filter(Boolean);
-    if(fl.length) block += "\n" + fl.map(x => "   – " + x).join("\n");
+    if(fl.length) block += "\n" + fl.map((x, i) => "   " + (i+1) + ". " + x).join("\n");
     return block;
   }).join("\n\n");
 }
@@ -634,7 +634,7 @@ function renderFields(){
   mi.oninput = e => { toAddr = e.target.value; };
   box.appendChild(mail);
 
-  const ks = tokens(t);
+  const ks = tokens(t).filter(k => k !== "eisagogi");
 
   ks.forEach(k => {
     const f = document.createElement("div"); f.className = "field";
