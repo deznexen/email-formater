@@ -123,10 +123,6 @@
   .ok{font-size:13px;color:var(--accent)}
   mark{background:var(--amber-soft);color:var(--amber);padding:0 2px}
 
-  details.editor{margin-top:16px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
-  details.editor summary{padding:11px 14px;cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
-  details.editor .body{padding:0 14px 14px}
-  details.editor textarea{min-height:210px;font-size:14px;line-height:1.55}
   .hint{font-size:12.5px;color:var(--muted);margin:6px 0 10px}
   code{background:var(--line-soft);padding:1px 5px;border-radius:3px;font-size:12.5px}
 
@@ -157,7 +153,6 @@
     <nav class="panel" aria-label="Φόρμες">
       <h2>Οι φόρμες σου</h2>
       <ul class="forms" id="list"></ul>
-      <button class="act newform" id="addForm">+ Νέα φόρμα</button>
     </nav>
 
     <section class="panel">
@@ -180,18 +175,6 @@
     </section>
   </div>
 
-  <details class="editor">
-    <summary>Επεξεργασία της φόρμας</summary>
-    <div class="body">
-      <p class="hint">Γράψε το κείμενο όπως θέλεις. Όπου βάλεις <code>{{proionta}}</code> μπαίνει η λίστα προϊόντων, <code>{{diastima}}</code> ο χρόνος αναμονής, <code>{{pelatis}}</code> το όνομα, <code>{{parangelia}}</code> ο αριθμός παραγγελίας. Τα πεδία αριστερά προσαρμόζονται μόνα τους.<br>Για ενικό/πληθυντικό γράψε <code>[[ενικός|πληθυντικός]]</code> — π.χ. <code>[[το προϊόν αναμένεται|τα προϊόντα αναμένονται]]</code>. Όταν υπάρχει ένα μόνο προϊόν μπαίνει το πρώτο, αλλιώς το δεύτερο.</p>
-      <div class="field"><label for="tName">Όνομα φόρμας</label><input type="text" id="tName"></div>
-      <div class="field"><label for="tSubj">Θέμα</label><input type="text" id="tSubj"></div>
-      <div class="field"><label for="tBody">Κείμενο</label><textarea id="tBody"></textarea></div>
-      <button class="act primary" id="saveT">Αποθήκευση φόρμας</button>
-      <button class="act" id="delT">Διαγραφή φόρμας</button>
-      <span id="tstatus" class="ok"></span>
-    </div>
-  </details>
 </div>
 
 <script>
@@ -873,13 +856,7 @@ function renderOut(){
   ta.style.height = Math.max(340, ta.scrollHeight) + "px";
 }
 
-function renderEditor(){
-  const t = tpl();
-  $("#tName").value = t.name; $("#tSubj").value = t.subject; $("#tBody").value = t.body;
-  $("#tstatus").textContent = "";
-}
-
-function renderAll(){ renderList(); renderFields(); renderOut(); renderEditor(); }
+function renderAll(){ renderList(); renderFields(); renderOut(); }
 
 /* ---------- ενέργειες ---------- */
 $("#body").addEventListener("input", () => { manual = true; $("#reset").hidden = false; });
@@ -930,28 +907,6 @@ $("#openMail").onclick = () => {
   countEmail();
   if(url.length > 1900) flash($("#status"), "Μεγάλο κείμενο — αν κοπεί, χρησιμοποίησε αντιγραφή");
   window.location.href = url;
-};
-
-$("#addForm").onclick = () => {
-  const t = {id:"c"+Date.now(), name:"Νέα φόρμα", subject:"", body:"Καλησπέρα σας,\n\n\n\nΜε εκτίμηση,"};
-  templates.push(t); current = t.id; manual = false;
-  renderAll(); save();
-  document.querySelector("details.editor").open = true;
-  $("#tName").focus();
-};
-$("#saveT").onclick = () => {
-  const t = tpl();
-  t.name = $("#tName").value.trim() || "Χωρίς όνομα";
-  t.subject = $("#tSubj").value;
-  t.body = $("#tBody").value;
-  manual = false; save(); renderAll();
-  flash($("#tstatus"), "Αποθηκεύτηκε");
-};
-$("#delT").onclick = () => {
-  if(templates.length === 1){ flash($("#tstatus"), "Πρέπει να μείνει τουλάχιστον μία φόρμα"); return; }
-  templates = templates.filter(t => t.id !== current);
-  current = templates[0].id; manual = false;
-  save(); renderAll();
 };
 
 (async () => {
