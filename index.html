@@ -71,6 +71,7 @@
   .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
   .field label.chk{display:flex;align-items:center;gap:8px;color:var(--ink);cursor:pointer;font-size:14px;margin-bottom:7px}
   .field label.chk input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .gblock .note{font-size:12.5px;color:var(--amber);background:var(--amber-soft);padding:5px 8px;border-radius:var(--radius);word-break:break-all}
   .gblock label.chk.sm{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;margin:1px 0 0}
   .gblock label.chk.sm input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
 
@@ -193,15 +194,13 @@ const DEFAULTS = [
     subject:"Σχετικά με την παραγγελία σας{{parangelia}}",
     body:`Καλησπέρα σας,
 
-Σας ευχαριστούμε για την παραγγελία σας{{parangelia}}. Θα θέλαμε να σας ενημερώσουμε για τα εξής:
+{{eisagogi}}
 
 {{provlimata}}
 
-Παρακαλούμε ενημερώστε μας πώς θα θέλατε να προχωρήσουμε, ώστε να επεξεργαστούμε άμεσα την παραγγελία σας.
+Σε αναμονή της απάντησής σας,
 
-Σας ευχαριστούμε πολύ για την κατανόηση.
-
-Με εκτίμηση,`
+Με εκτίμηση.`
   },
   {
     id:"epistrofi", name:"Επιστροφή προϊόντος",
@@ -259,6 +258,12 @@ let gItems = [{n:"",f:""}];               // προϊόντα με επιλογ�
 let cItems = [{n:"",l:"",type:"none",t:"",u:"ημέρες",f:""}];     // συνδυαστικό
 const TYPES = {none:"Χωρίς πρόβλημα", elleipsi:"Έλλειψη", anamoni:"Αναμονή παραλαβής", gefsi:"Λείπει γεύση"};
 let toAddr = "";       // email πελάτη
+let noAnswer = false;  // προηγήθηκε κλήση χωρίς απάντηση
+let orderUrl = "";     // σελίδα παραγγελίας του πελάτη
+function orderText(){
+  const v = (values.parangelia || "").trim();
+  return v ? " με αριθμό #" + v : "";
+}
 let payMode = "cod";   // cod = αντικαταβολή, paid = εξοφλημένη
 const PAY = {
   cod:  "χωρίς να χρεωθείτε το αντίστοιχο ποσό",
@@ -269,6 +274,10 @@ const SECTIONS = {
   elleipsi: {
     intro:"[[Το παρακάτω προϊόν της παραγγελίας σας δεν είναι διαθέσιμο|Τα παρακάτω προϊόντα της παραγγελίας σας δεν είναι διαθέσιμα]]:",
     outro:"Μπορούμε είτε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας {{POSO}}, είτε να [[το|τα]] αντικαταστήσουμε με [[κάποιο άλλο προϊόν|κάποια άλλα προϊόντα]] της επιλογής σας."
+  },
+  elleipsiAlt: {
+    intro:"[[Το παρακάτω προϊόν της παραγγελίας σας δεν είναι διαθέσιμο|Τα παρακάτω προϊόντα της παραγγελίας σας δεν είναι διαθέσιμα]]:",
+    outro:"Μπορούμε είτε να [[το|τα]] αφαιρέσουμε από την παραγγελία σας {{POSO}}, είτε να [[το|τα]] αντικαταστήσουμε με [[την εναλλακτική που σας προτείνουμε παραπάνω|τις εναλλακτικές που σας προτείνουμε παραπάνω]] — ή με οποιοδήποτε άλλο προϊόν της επιλογής σας."
   },
   elleipsiNoAlt: {
     intro:"[[Το παρακάτω προϊόν δεν είναι διαθέσιμο και δεν διαθέτουμε|Τα παρακάτω προϊόντα δεν είναι διαθέσιμα και δεν διαθέτουμε]] αυτή τη στιγμή [[κάποιο αντίστοιχο προϊόν|αντίστοιχα προϊόντα]] για αντικατάσταση:",
@@ -285,7 +294,8 @@ const SECTIONS = {
 };
 // σειρά εμφάνισης και ποια προϊόντα ανήκουν σε κάθε παράγραφο
 const GROUPS = [
-  {sec:"elleipsi",      pick: c => c.type === "elleipsi" && !c.na},
+  {sec:"elleipsi",      pick: c => c.type === "elleipsi" && !c.na && !altList(c.alt).length},
+  {sec:"elleipsiAlt",   pick: c => c.type === "elleipsi" && !c.na && altList(c.alt).length > 0},
   {sec:"elleipsiNoAlt", pick: c => c.type === "elleipsi" && c.na},
   {sec:"anamoni",       pick: c => c.type === "anamoni"},
   {sec:"gefsi",         pick: c => c.type === "gefsi"}
@@ -445,12 +455,13 @@ function parseF1(text){
   try{ d = JSON.parse(text); }catch(e){ return null; }
   if(!d || !d.f1order) return null;
   const o = d.f1order;
-  const rows = (o.items || []).map(it => ({
+  const rows = (o.items || []).filter(it => it.missing || (it.note || "").trim()).map(it => ({
     n: cleanName(it.name || "") + (it.qty > 1 ? " ×" + it.qty : ""),
     l: it.link || "",
+    note: (it.note || "").trim(),
     missing: !!it.missing
   }));
-  return {rows, meta:{order:o.order || "", email:o.email || "", name:o.name || ""}};
+  return {rows, meta:{order:o.order || "", email:o.email || "", name:o.name || "", url:o.url || ""}};
 }
 function parseAny(text){
   const f1 = parseF1(text.trim());
@@ -477,6 +488,7 @@ function importBox(f, onImport){
       if(res.meta.order) values.parangelia = res.meta.order;
       if(res.meta.email) toAddr = res.meta.email;
       if(res.meta.name) values.pelatis = res.meta.name;
+      if(res.meta.url) orderUrl = res.meta.url;
     }
     onImport(res.rows); ta.value = "";
     renderFields(); renderOut();
@@ -583,9 +595,13 @@ function fill(text){
     if(k === "proionta") return listText() || "[λίστα προϊόντων]";
     if(k === "gefseis") return gefseisText() || "[προϊόντα και γεύσεις]";
     if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
-    if(k === "parangelia"){
-      const v = (values.parangelia || "").trim();
-      return v ? " με αριθμό " + v : "";
+    if(k === "parangelia") return orderText();
+    if(k === "eisagogi"){
+      const u = orderUrl.trim();
+      const link = u ? "\n\nΜπορείτε να δείτε την παραγγελία σας εδώ: " + u : "";
+      return (noAnswer
+        ? "Σας ευχαριστούμε για την παραγγελία σας" + orderText() + ". Το παρόν email στέλνεται σε συνέχεια της αποτυχημένης προσπάθειας επικοινωνίας μας μαζί σας."
+        : "Σας ευχαριστούμε για την παραγγελία σας" + orderText() + ". Θα θέλαμε να σας ενημερώσουμε για τα εξής:") + link;
     }
     if(k === "diastima") return durValue() || "[χρόνος αναμονής]";
     const v = (values[k] || "").trim();
@@ -656,8 +672,12 @@ function renderFields(){
         rows.forEach(r => items.push({n:r.n, l:r.l, t:"", u:"ημέρες"}));
       });
     } else if(k === "provlimata"){
-      f.innerHTML = '<label class="chk"><input type="checkbox" id="paid"> Πληρωμένη παραγγελία (όχι αντικαταβολή)</label>'
+      f.innerHTML = '<label class="chk"><input type="checkbox" id="nocall"> Προηγήθηκε κλήση χωρίς απάντηση</label>'
+        + '<label class="chk"><input type="checkbox" id="paid"> Πληρωμένη παραγγελία (όχι αντικαταβολή)</label>'
         + '<label style="margin-top:11px">Προϊόντα και τι συμβαίνει στο καθένα</label><div class="rows"></div>';
+      const nc = f.querySelector("#nocall");
+      nc.checked = noAnswer;
+      nc.onchange = e => { noAnswer = e.target.checked; renderOut(); };
       const chk = f.querySelector("#paid");
       chk.checked = payMode === "paid";
       chk.onchange = e => { payMode = e.target.checked ? "paid" : "cod"; renderOut(); };
@@ -703,6 +723,12 @@ function renderFields(){
           fl.value = c.f;
           fl.oninput = e => { c.f = e.target.value; renderOut(); };
         }
+        if((c.note || "").trim()){
+          const nt = document.createElement("div");
+          nt.className = "note";
+          nt.textContent = "Σχόλιο αποθήκης: " + c.note.trim();
+          blk.appendChild(nt);
+        }
         blk.querySelector(".del").onclick = () => {
           cItems.splice(idx,1);
           if(!cItems.length) cItems.push({n:"",l:"",type:"none",t:"",u:"ημέρες",f:""});
@@ -718,7 +744,7 @@ function renderFields(){
       importBox(f, rows => {
         if(cItems.length === 1 && !cItems[0].n && !cItems[0].l) cItems = [];
         rows.forEach(r => cItems.push({n:r.n, l:r.l, type: r.missing ? "elleipsi" : "none",
-          t:"", u:"ημέρες", f:"", na:false, alt:""}));
+          t:"", u:"ημέρες", f:"", na:false, alt:"", note:r.note || ""}));
       });
     } else if(k === "gefseis"){
       f.innerHTML = '<label>Προϊόντα και διαθέσιμες γεύσεις</label><div class="rows"></div>';
@@ -773,6 +799,16 @@ function renderFields(){
       const inp = f.querySelector("input");
       inp.value = values[k] || "";
       inp.oninput = e => { values[k] = e.target.value; renderOut(); };
+      if(k === "parangelia"){
+        const lf = document.createElement("div");
+        lf.className = "field";
+        lf.style.marginTop = "13px";
+        lf.innerHTML = '<label for="ourl">Link παραγγελίας πελάτη</label><input type="text" id="ourl" placeholder="https://fit1.gr/cart-done?order=…">';
+        const li = lf.querySelector("input");
+        li.value = orderUrl;
+        li.oninput = e => { orderUrl = e.target.value; renderOut(); };
+        box.appendChild(f); box.appendChild(lf); return;
+      }
     }
     box.appendChild(f);
   });
