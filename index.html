@@ -115,8 +115,9 @@
   .subject{font-weight:500;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-soft);font-size:14.5px}
   #body{
     width:100%;min-height:340px;border:0;padding:0;font-size:15px;line-height:1.62;
-    background:transparent;
+    background:transparent;outline:none;
   }
+  #body a{color:var(--accent)}
   #body:focus{outline:none}
   .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:11px 14px;border-top:1px solid var(--line-soft)}
   .note{font-size:12.5px;color:var(--amber);background:var(--amber-soft);padding:2px 8px;border-radius:20px}
@@ -164,7 +165,7 @@
       <h2>Έτοιμο email</h2>
       <div class="out">
         <div class="subject" id="subj"></div>
-        <textarea id="body" spellcheck="false"></textarea>
+        <div id="body" contenteditable="true" spellcheck="false"></div>
       </div>
       <div class="toolbar">
         <button class="act primary" id="copyBody">Αντιγραφή κειμένου</button>
@@ -252,7 +253,8 @@ let noAnswer = false;  // προηγήθηκε κλήση χωρίς απάντ�
 let orderUrl = "";     // σελίδα παραγγελίας του πελάτη
 function orderText(){
   const v = (values.parangelia || "").trim();
-  return v ? " με αριθμό #" + v : "";
+  if(!v) return "";
+  return " με αριθμό " + L("#" + v, orderUrl.trim());
 }
 let payMode = "cod";   // cod = αντικαταβολή, paid = εξοφλημένη
 const PAY = {
@@ -488,6 +490,24 @@ function importBox(f, onImport){
 }
 // εναλλακτικά προϊόντα: links ή κωδικοί, χωρισμένα με κόμμα ή κενό
 // κάθε link από άλλο site του ομίλου γίνεται fit1.gr, και συντομεύεται στον κωδικό
+// σύνδεσμος μέσα στο κείμενο: κείμενο + διεύθυνση, αόρατα σημάδια
+const L = (label, url) => url ? "\u0001" + label + "\u0002" + url + "\u0003" : label;
+const LRE = /\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003/g;
+function toPlain(t){
+  return t.replace(LRE, (_, lab, url) => lab === url ? url : lab + " – " + url);
+}
+function esc(t){ return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function toHtml(t){
+  let out = "", last = 0, m;
+  LRE.lastIndex = 0;
+  while((m = LRE.exec(t))){
+    out += esc(t.slice(last, m.index));
+    out += '<a href="' + esc(m[2]) + '">' + esc(m[1]) + '</a>';
+    last = m.index + m[0].length;
+  }
+  out += esc(t.slice(last));
+  return out.replace(/\n/g, "<br>");
+}
 function toFit1(u){
   u = (u || "").trim();
   if(!u) return "";
@@ -504,14 +524,16 @@ function altList(txt){
   return (txt || "").split(/[,\n\s]+/).map(x => x.trim()).filter(Boolean).map(x => {
     if(/^\d{3,7}$/.test(x)){
       const rec = byId && byId.get(x);
-      return rec ? recName(rec) + " – " + recLink(rec) : "https://fit1.gr/" + x;
+      return rec ? L(recName(rec), recLink(rec)) : L("https://fit1.gr/" + x, "https://fit1.gr/" + x);
     }
-    return toFit1(x);
+    const u = toFit1(x);
+    const rec2 = byId && byId.get((u.match(/(\d{3,7})$/) || [])[1] || "");
+    return rec2 ? L(recName(rec2), u) : L(u, u);
   });
 }
 function comboLine(c){
-  let line = "• " + (c.n.trim() || c.l.trim());
-  if(c.n.trim() && c.l.trim()) line += " – " + c.l.trim();
+  const nm = c.n.trim(), lk = toFit1(c.l.trim());
+  let line = "• " + (nm ? L(nm, lk) : lk);
   if(c.type === "anamoni" && c.t.trim()) line += " (αναμένεται σε " + c.t.trim() + " " + unitFor(c.t, c.u) + ")";
   if(c.type === "gefsi"){
     const fl = c.f.split(",").map(x => x.trim()).filter(Boolean);
@@ -637,8 +659,7 @@ function fill(text){
     if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
     if(k === "parangelia") return orderText();
     if(k === "eisagogi"){
-      const u = orderUrl.trim();
-      const link = u ? "\n\nΜπορείτε να δείτε την παραγγελία σας εδώ: " + u : "";
+      const link = "";
       return (noAnswer
         ? "Σας ευχαριστούμε για την παραγγελία σας" + orderText() + ". Το παρόν email στέλνεται σε συνέχεια της αποτυχημένης προσπάθειας επικοινωνίας μας μαζί σας."
         : "Σας ευχαριστούμε για την παραγγελία σας" + orderText() + ". Θα θέλαμε να σας ενημερώσουμε για τα εξής:") + link;
@@ -878,12 +899,9 @@ function renderFields(){
 
 function renderOut(){
   const t = tpl();
-  $("#subj").textContent = fill(t.subject);
-  if(!manual) $("#body").value = fill(t.body).replace(/\n{3,}/g, "\n\n");
+  $("#subj").textContent = toPlain(fill(t.subject));
+  if(!manual) $("#body").innerHTML = toHtml(fill(t.body).replace(/\n{3,}/g, "\n\n"));
   $("#reset").hidden = !manual;
-  const ta = $("#body");
-  ta.style.height = "auto";
-  ta.style.height = Math.max(340, ta.scrollHeight) + "px";
 }
 
 function renderAll(){ renderList(); renderFields(); renderOut(); }
@@ -929,11 +947,29 @@ async function copy(text, msg){
     flash($("#status"), "Αντιγράφηκε το κείμενο");
   }
 }
-$("#copyBody").onclick = () => copy($("#body").value, "Αντιγράφηκε το κείμενο");
+function cleanHtml(){
+  const clone = $("#body").cloneNode(true);
+  clone.querySelectorAll("*").forEach(el => {
+    el.removeAttribute("class"); el.removeAttribute("id"); el.removeAttribute("style");
+  });
+  return '<div style="font-family:Arial,Helvetica,sans-serif">' + clone.innerHTML + "</div>";
+}
+$("#copyBody").onclick = async () => {
+  const html = cleanHtml(), text = $("#body").innerText;
+  try{
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html], {type:"text/html"}),
+      "text/plain": new Blob([text], {type:"text/plain"})
+    })]);
+    flash($("#status"), "Αντιγράφηκε με τους συνδέσμους");
+  }catch(e){
+    copy(text, "Αντιγράφηκε ως κείμενο");
+  }
+};
 $("#openMail").onclick = () => {
   const url = "mailto:" + encodeURIComponent(toAddr.trim())
     + "?subject=" + encodeURIComponent($("#subj").textContent)
-    + "&body=" + encodeURIComponent($("#body").value);
+    + "&body=" + encodeURIComponent($("#body").innerText);
   countEmail();
   if(url.length > 1900) flash($("#status"), "Μεγάλο κείμενο — αν κοπεί, χρησιμοποίησε αντιγραφή");
   window.location.href = url;
