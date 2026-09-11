@@ -182,7 +182,7 @@
 const DEFAULTS = [
   {
     id:"combo", name:"Ενημέρωση παραγγελίας",
-    subject:"Σχετικά με την παραγγελία σας{{parangelia}}",
+    subject:"Σχετικά με την παραγγελία σας{{arithmos}}",
     body:`Καλησπέρα σας,
 
 {{eisagogi}}
@@ -496,6 +496,7 @@ const LRE = /\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003/g;
 function toPlain(t){
   return t.replace(LRE, (_, lab, url) => lab === url ? url : lab + " – " + url);
 }
+function toLabel(t){ return t.replace(LRE, (_, lab) => lab); }
 function esc(t){ return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function toHtml(t){
   let out = "", last = 0, m;
@@ -658,6 +659,10 @@ function fill(text){
     if(k === "gefseis") return gefseisText() || "[προϊόντα και γεύσεις]";
     if(k === "provlimata") return comboText() || "[προϊόντα και προβλήματα]";
     if(k === "parangelia") return orderText();
+    if(k === "arithmos"){
+      const v = (values.parangelia || "").trim();
+      return v ? " " + v : "";
+    }
     if(k === "eisagogi"){
       const link = "";
       return (noAnswer
@@ -713,7 +718,7 @@ function renderFields(){
   mi.oninput = e => { toAddr = e.target.value; };
   box.appendChild(mail);
 
-  const ks = tokens(t).filter(k => k !== "eisagogi");
+  const ks = tokens(t).filter(k => k !== "eisagogi" && k !== "arithmos");
 
   ks.forEach(k => {
     const f = document.createElement("div"); f.className = "field";
@@ -899,7 +904,7 @@ function renderFields(){
 
 function renderOut(){
   const t = tpl();
-  $("#subj").textContent = toPlain(fill(t.subject));
+  $("#subj").textContent = toLabel(fill(t.subject));
   if(!manual) $("#body").innerHTML = toHtml(fill(t.body).replace(/\n{3,}/g, "\n\n"));
   $("#reset").hidden = !manual;
 }
