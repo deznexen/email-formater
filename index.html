@@ -447,7 +447,7 @@ function parseF1(text){
   const o = d.f1order;
   const rows = (o.items || []).filter(it => it.missing || (it.note || "").trim()).map(it => ({
     n: cleanName(it.name || "") + (it.qty > 1 ? " ×" + it.qty : ""),
-    l: it.link || "",
+    l: toFit1(it.link || ""),
     note: (it.note || "").trim(),
     missing: !!it.missing
   }));
@@ -487,13 +487,26 @@ function importBox(f, onImport){
   f.appendChild(box);
 }
 // εναλλακτικά προϊόντα: links ή κωδικοί, χωρισμένα με κόμμα ή κενό
+// κάθε link από άλλο site του ομίλου γίνεται fit1.gr, και συντομεύεται στον κωδικό
+function toFit1(u){
+  u = (u || "").trim();
+  if(!u) return "";
+  if(/^\/\//.test(u)) u = "https:" + u;
+  if(!/^https?:\/\//i.test(u)) u = "https://" + u;
+  let x;
+  try{ x = new URL(u); }catch(e){ return u; }
+  const id = (x.pathname.match(/(\d{3,7})\/?$/) || [])[1];
+  if(id) return "https://fit1.gr/" + id;
+  if(/fit1\.gr$/i.test(x.hostname)) return u;
+  return "https://fit1.gr" + x.pathname + x.search;
+}
 function altList(txt){
   return (txt || "").split(/[,\n\s]+/).map(x => x.trim()).filter(Boolean).map(x => {
     if(/^\d{3,7}$/.test(x)){
       const rec = byId && byId.get(x);
       return rec ? recName(rec) + " – " + recLink(rec) : "https://fit1.gr/" + x;
     }
-    return x;
+    return toFit1(x);
   });
 }
 function comboLine(c){
@@ -507,7 +520,7 @@ function comboLine(c){
   if(c.type === "elleipsi"){
     const alts = altList(c.alt);
     if(alts.length === 1) line += "\n   Προτεινόμενη εναλλακτική: " + alts[0];
-    else if(alts.length > 1) line += "\n   Προτεινόμενες εναλλακτικές:\n" + alts.map(x => "      – " + x).join("\n");
+    else if(alts.length > 1) line += "\n   Προτεινόμενες εναλλακτικές:\n" + alts.map((x, i) => "      " + (i+1) + ". " + x).join("\n");
   }
   return line;
 }
@@ -769,6 +782,23 @@ function renderFields(){
           nt.className = "note";
           nt.textContent = "Σχόλιο αποθήκης: " + c.note.trim();
           blk.appendChild(nt);
+          const urls = c.note.match(/(https?:\/\/|www\.)\S+/g);
+          if(urls && c.type === "elleipsi"){
+            const lab = document.createElement("label");
+            lab.className = "chk sm";
+            lab.innerHTML = '<input type="checkbox"> Χρήση ως εναλλακτική';
+            const cb = lab.querySelector("input");
+            const links = urls.map(toFit1);
+            cb.checked = links.every(l => (c.alt || "").includes(l));
+            cb.onchange = e => {
+              const have = altList(c.alt);
+              c.alt = e.target.checked
+                ? [...new Set([...have, ...links])].join(", ")
+                : have.filter(x => !links.includes(x)).join(", ");
+              renderFields(); renderOut();
+            };
+            blk.appendChild(lab);
+          }
         }
         blk.querySelector(".del").onclick = () => {
           cItems.splice(idx,1);
