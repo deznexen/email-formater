@@ -27,6 +27,7 @@
   .sig{margin-left:auto;display:flex;align-items:center;gap:8px}
   .sig label{font-size:13px;color:var(--muted)}
   .sig label.act{color:var(--ink);cursor:pointer;font-size:14px}
+  .count{font-size:13px;color:var(--accent);background:var(--accent-soft);padding:5px 11px;border-radius:20px;white-space:nowrap}
 
   input[type=text],textarea,select{
     font:inherit;color:var(--ink);background:var(--paper);
@@ -37,7 +38,7 @@
     outline:2px solid var(--accent);outline-offset:1px;
   }
 
-  .layout{display:grid;grid-template-columns:236px minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  .layout{display:grid;grid-template-columns:168px minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
   .panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius)}
   .panel > h2{
     font-size:13px;font-weight:600;color:var(--muted);margin:0;
@@ -88,11 +89,15 @@
   }
   .row .dur button{padding:6px 9px;font-size:13px}
   .gblock{border:1px solid var(--line-soft);border-radius:var(--radius);padding:9px;display:flex;flex-direction:column;gap:6px}
+  .gblock.g-elleipsi{border-left:3px solid #D86B62}
+  .gblock.g-anamoni{border-left:3px solid var(--amber)}
+  .gblock.g-gefsi{border-left:3px solid #5FA8D3}
+  .gblock.g-none{border-left:3px solid var(--line)}
   .gtop{display:grid;grid-template-columns:1fr 28px;gap:6px;align-items:center}
   .crow{display:grid;grid-template-columns:1fr 165px;gap:6px}
   .crow select{padding:6px 8px;font-size:14px}
   .gblock input{padding:6px 8px;font-size:14px}
-  .imp{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+  .imp{margin:0 0 15px;padding-bottom:14px;border-bottom:1px dashed var(--line)}
   .imp textarea{min-height:70px;font-size:13.5px;margin-bottom:6px}
   .seg{display:flex;gap:6px}
   .seg button{
@@ -141,6 +146,8 @@
       <p>Διάλεξε φόρμα, συμπλήρωσε τα πεδία, αντίγραψε το έτοιμο κείμενο.</p>
     </div>
     <div class="sig">
+      <span id="count" class="count" title="Email σήμερα">—</span>
+      <button class="act" id="reset-all">Νέα παραγγελία</button>
       <label class="act" for="cat" id="catLabel" title="Φόρτωσε το αρχείο CSV με τα προϊόντα">Κατάλογος…</label>
       <input type="file" id="cat" accept=".csv,text/csv" hidden>
     </div>
@@ -490,6 +497,7 @@ function importBox(f, onImport){
       if(res.meta.name) values.pelatis = res.meta.name;
       if(res.meta.url) orderUrl = res.meta.url;
     }
+    counted = false;
     onImport(res.rows); ta.value = "";
     renderFields(); renderOut();
   };
@@ -535,7 +543,43 @@ let manual = false;         // ο χρήστης πείραξε το κείμε�
 
 const $ = s => document.querySelector(s);
 
-/* ---------- αποθήκευση ---------- */
+const today = () => new Date().toLocaleDateString("sv-SE");   // ΕΕΕΕ-ΜΜ-ΗΗ τοπική ώρα
+let sent = {date: today(), count: 0};
+let counted = false;   // για να μη μετρηθεί δύο φορές το ίδιο email
+
+function storeGet(key){
+  try{
+    if(window.storage) return window.storage.get(key).then(r => r && r.value).catch(() => null);
+    return Promise.resolve(localStorage.getItem(key));
+  }catch(e){ return Promise.resolve(null); }
+}
+function storeSet(key, val){
+  try{
+    if(window.storage) return window.storage.set(key, val).catch(() => {});
+    localStorage.setItem(key, val);
+  }catch(e){}
+  return Promise.resolve();
+}
+function showCount(){
+  $("#count").textContent = "Σήμερα: " + sent.count;
+}
+async function loadCount(){
+  const raw = await storeGet("sent_v1");
+  if(raw){
+    try{
+      const d = JSON.parse(raw);
+      if(d && d.date === today()) sent = d; else sent = {date: today(), count: 0};
+    }catch(e){}
+  }
+  showCount();
+}
+function countEmail(){
+  if(counted) return;
+  if(sent.date !== today()) sent = {date: today(), count: 0};   // νέα μέρα, μηδενισμός
+  sent.count++; counted = true;
+  showCount(); storeSet("sent_v1", JSON.stringify(sent));
+}
+
 async function load(){
   try{
     const r = await window.storage.get("forms_v11");
@@ -626,6 +670,24 @@ function renderFields(){
   const t = tpl(), box = $("#fields");
   box.innerHTML = "";
   $("#fieldsTitle").textContent = "Στοιχεία — " + t.name;
+  const ks0 = tokens(t);
+  const target = ks0.includes("provlimata") ? rows => {
+      if(cItems.length === 1 && !cItems[0].n && !cItems[0].l) cItems = [];
+      rows.forEach(r => cItems.push({n:r.n, l:r.l, type: r.missing ? "elleipsi" : "none",
+        t:"", u:"ημέρες", f:"", na:false, alt:"", note:r.note || ""}));
+    } : ks0.includes("proionta") ? rows => {
+      if(items.length === 1 && !items[0].n && !items[0].l) items = [];
+      rows.forEach(r => items.push({n:r.n, l:r.l, t:"", u:"ημέρες"}));
+    } : ks0.includes("gefseis") ? rows => {
+      if(gItems.length === 1 && !gItems[0].n) gItems = [];
+      rows.forEach(r => gItems.push({n:r.n || r.l, f:""}));
+    } : null;
+  if(target){
+    const f0 = document.createElement("div");
+    importBox(f0, target);
+    box.appendChild(f0);
+  }
+
   const mail = document.createElement("div");
   mail.className = "field";
   mail.innerHTML = '<label for="to">Email πελάτη</label><input type="text" id="to" placeholder="π.χ. pelatis@example.com">';
@@ -667,10 +729,6 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { items.push({n:"",l:"",t:"",u:"ημέρες"}); renderFields(); };
       f.appendChild(add);
-      importBox(f, rows => {
-        if(items.length === 1 && !items[0].n && !items[0].l) items = [];
-        rows.forEach(r => items.push({n:r.n, l:r.l, t:"", u:"ημέρες"}));
-      });
     } else if(k === "provlimata"){
       f.innerHTML = '<label class="chk"><input type="checkbox" id="nocall"> Προηγήθηκε κλήση χωρίς απάντηση</label>'
         + '<label class="chk"><input type="checkbox" id="paid"> Πληρωμένη παραγγελία (όχι αντικαταβολή)</label>'
@@ -683,7 +741,7 @@ function renderFields(){
       chk.onchange = e => { payMode = e.target.checked ? "paid" : "cod"; renderOut(); };
       const rows = f.querySelector(".rows");
       cItems.forEach((c, idx) => {
-        const blk = document.createElement("div"); blk.className = "gblock";
+        const blk = document.createElement("div"); blk.className = "gblock g-" + c.type;
         let extra = "";
         if(c.type === "elleipsi") extra = '<input type="text" class="alt" placeholder="Εναλλακτικά προϊόντα — links ή κωδικοί, χωρισμένα με κόμμα">'
           + '<label class="chk sm"><input type="checkbox" class="na"> Δεν υπάρχει αντίστοιχο για αντικατάσταση</label>';
@@ -741,11 +799,6 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { cItems.push({n:"",l:"",type:"none",t:"",u:"ημέρες",f:""}); renderFields(); };
       f.appendChild(add);
-      importBox(f, rows => {
-        if(cItems.length === 1 && !cItems[0].n && !cItems[0].l) cItems = [];
-        rows.forEach(r => cItems.push({n:r.n, l:r.l, type: r.missing ? "elleipsi" : "none",
-          t:"", u:"ημέρες", f:"", na:false, alt:"", note:r.note || ""}));
-      });
     } else if(k === "gefseis"){
       f.innerHTML = '<label>Προϊόντα και διαθέσιμες γεύσεις</label><div class="rows"></div>';
       const rows = f.querySelector(".rows");
@@ -768,10 +821,6 @@ function renderFields(){
       add.style.marginTop = "8px";
       add.onclick = () => { gItems.push({n:"",f:""}); renderFields(); };
       f.appendChild(add);
-      importBox(f, rows => {
-        if(gItems.length === 1 && !gItems[0].n) gItems = [];
-        rows.forEach(r => gItems.push({n:r.n || r.l, f:""}));
-      });
     } else if(k === "prosfonisi"){
       if(!values.prosfonisi) values.prosfonisi = "Αγαπητέ";
       f.innerHTML = '<label>Προσφώνηση</label><div class="seg"></div>';
@@ -836,6 +885,16 @@ function renderAll(){ renderList(); renderFields(); renderOut(); renderEditor();
 $("#body").addEventListener("input", () => { manual = true; $("#reset").hidden = false; });
 $("#reset").onclick = () => { manual = false; renderOut(); };
 
+$("#reset-all").onclick = () => {
+  cItems = [{n:"",l:"",type:"none",t:"",u:"ημέρες",f:"",na:false,alt:"",note:""}];
+  items = [{n:"",l:"",t:"",u:"ημέρες"}];
+  gItems = [{n:"",f:""}];
+  values = {}; toAddr = ""; orderUrl = "";
+  noAnswer = false; payMode = "cod"; manual = false; counted = false;
+  renderFields(); renderOut();
+  flash($("#status"), "Καθαρίστηκε");
+};
+
 $("#cat").onchange = e => {
   const file = e.target.files[0];
   if(!file) return;
@@ -868,6 +927,7 @@ $("#openMail").onclick = () => {
   const url = "mailto:" + encodeURIComponent(toAddr.trim())
     + "?subject=" + encodeURIComponent($("#subj").textContent)
     + "&body=" + encodeURIComponent($("#body").value);
+  countEmail();
   if(url.length > 1900) flash($("#status"), "Μεγάλο κείμενο — αν κοπεί, χρησιμοποίησε αντιγραφή");
   window.location.href = url;
 };
@@ -896,6 +956,7 @@ $("#delT").onclick = () => {
 
 (async () => {
   await load();
+  loadCount();
   renderAll();
 })();
 </script>
